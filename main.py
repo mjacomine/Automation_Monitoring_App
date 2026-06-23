@@ -24,6 +24,8 @@ from monitoring import (
     Settings,
     analyze_jobs,
     authenticate,
+    persist_metrics_jobs,
+    persist_snapshot,
 )
 from monitoring.reporting import render_console, render_dashboard
 
@@ -51,16 +53,29 @@ def run(settings: Settings) -> int:
     print(f"Calling Get Jobs with $filter: {filter_desc}\n")
     payload = client.get_jobs()
 
-    # 3. Analyze (pure) ----------------------------------------------------
+    # 3. Persist raw payload + per-job rows (skipped if no DATABASE_URL) ----
+    result = persist_snapshot(settings, payload, filter_desc)
+    if result is None:
+        print("Persistence skipped (no DATABASE_URL set).\n")
+    else:
+        snapshot_id, job_count = result
+        print(f"Persisted snapshot #{snapshot_id} ({job_count} job(s) upserted).\n")
+
+    # 3b. Mirror select fields into the auto_metrics_jobs table -------------
+    metrics_count = persist_metrics_jobs(settings, payload)
+    if metrics_count is not None:
+        print(f"Upserted {metrics_count} row(s) into auto_metrics_jobs.\n")
+
+    # 4. Analyze (pure) ----------------------------------------------------
     analysis = analyze_jobs(payload, settings.success_threshold)
     print(f"Returned {analysis.total_jobs} job(s).")
     print(f"Unique ReleaseName count: {analysis.unique_automations}\n")
 
-    # 4. Report — console --------------------------------------------------
+    # 5. Report — console --------------------------------------------------
     print("Job counts per ReleaseName by State:")
     print(render_console(analysis))
 
-    # 5. Report — HTML dashboard ------------------------------------------
+    # 6. Report — HTML dashboard ------------------------------------------
     html = render_dashboard(analysis, filter_desc)
     output_path = _write_dashboard(settings, html)
     print(f"\nDashboard written to: {output_path}")

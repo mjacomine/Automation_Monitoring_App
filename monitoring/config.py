@@ -41,6 +41,11 @@ class Settings:
     # Restrict to a single SourceType ("Schedule", "Manual", ...) or None for all.
     source_type: str | None = "Schedule"
 
+    # --- Persistence --------------------------------------------------------
+    # Supabase/Postgres connection string. When unset, persistence is skipped
+    # (the app still runs and reports), so local dev needs no database.
+    database_url: str | None = None
+
     # --- Behaviour ----------------------------------------------------------
     request_timeout: int = 30
     # Success-rate threshold (percent) at or above which a process is "healthy".
@@ -72,4 +77,5 @@ class Settings:
             client_secret=client_secret,
             creation_time=os.getenv("MONITOR_CREATION_TIME", cls.creation_time),
             source_type=os.getenv("MONITOR_SOURCE_TYPE", cls.source_type),
+            database_url=os.getenv("DATABASE_URL") or None,
         )
