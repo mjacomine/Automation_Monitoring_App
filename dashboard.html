@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPA Job Success Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #467958;
+    color: #1e293b;
+    padding: 40px 24px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { color: #f8fafc; margin-bottom: 28px; }
+  header h1 { font-size: 26px; font-weight: 600; letter-spacing: .3px; }
+  header .sub { color: #FFFFFF; font-size: 14px; margin-top: 6px; }
+  .kpis {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  .kpi {
+    background: #ffffff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  }
+  .kpi .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    color: #64748b; font-weight: 600;
+  }
+  .kpi .value { font-size: 30px; font-weight: 700; margin-top: 8px; }
+  .card {
+    background: #ffffff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #82A2B1; color: #f1f5f9; text-align: right;
+    padding: 14px 16px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .6px; font-weight: 600;
+  }
+  thead th:first-child { text-align: left; }
+  tbody td {
+    padding: 14px 16px; border-bottom: 1px solid #e2e8f0;
+    font-size: 15px; text-align: right;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  td.name { text-align: left; font-weight: 600; color: #0f172a; }
+  td.num { color: #475569; font-variant-numeric: tabular-nums; }
+  td.total { font-weight: 700; color: #0f172a; }
+  td.pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 7px; vertical-align: middle;
+  }
+  .badge {
+    color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 999px; text-transform: uppercase; letter-spacing: .5px;
+    white-space: nowrap;
+  }
+  .legend {
+    background: #ffffff; color: #000000; margin-top: 18px;
+    border-radius: 12px; padding: 18px 20px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  }
+  .legend .legend-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    font-weight: 700; color: #000000; margin-bottom: 12px;
+  }
+  .legend .legend-items {
+    display: flex; gap: 24px; font-size: 13px; align-items: center;
+  }
+  .legend .dot { width: 11px; height: 11px; }
+  footer { color: #64748b; font-size: 12px; margin-top: 22px; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>RPA Job Success Dashboard</h1>
+      <div class="sub">Generated June 22, 2026 at 12:11 PM &nbsp;&bull;&nbsp; Filter: (CreationTime gt 2026-03-22T00:00:00.000Z and SourceType eq &#x27;Schedule&#x27;)</div>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="label">Unique Automations</div>
+        <div class="value">5</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Total Jobs</div>
+        <div class="value">306</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Overall Success</div>
+        <div class="value" style="color:#008000;">97.1%</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Processes On Target</div>
+        <div class="value" style="color:#008000;">3</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Processes At Risk</div>
+        <div class="value" style="color:#FF0000;">2</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Process (ReleaseName)</th>
+            <th>Faulted</th><th>Stopped</th><th>Successful</th>
+            <th>Total</th>
+            <th>Success %</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="name">Robot ID Refresh</td>
+          <td class='num'>2</td><td class='num'>0</td><td class='num'>245</td>
+          <td class="num total">247</td>
+          <td class="pct" style="color:#008000;">
+            <span class="dot" style="background:#008000;"></span>99.2%
+          </td>
+          <td><span class="badge" style="background:#008000;">On Target</span></td>
+        </tr>
+        <tr>
+          <td class="name">GHP Provider Selection</td>
+          <td class='num'>1</td><td class='num'>5</td><td class='num'>25</td>
+          <td class="num total">31</td>
+          <td class="pct" style="color:#FF0000;">
+            <span class="dot" style="background:#FF0000;"></span>80.6%
+          </td>
+          <td><span class="badge" style="background:#FF0000;">Needs Attention</span></td>
+        </tr>
+        <tr>
+          <td class="name">OrchestratorRetention_Performer</td>
+          <td class='num'>0</td><td class='num'>0</td><td class='num'>23</td>
+          <td class="num total">23</td>
+          <td class="pct" style="color:#008000;">
+            <span class="dot" style="background:#008000;"></span>100.0%
+          </td>
+          <td><span class="badge" style="background:#008000;">On Target</span></td>
+        </tr>
+        <tr>
+          <td class="name">OrchestratorRetention_Dispatcher</td>
+          <td class='num'>0</td><td class='num'>0</td><td class='num'>4</td>
+          <td class="num total">4</td>
+          <td class="pct" style="color:#008000;">
+            <span class="dot" style="background:#008000;"></span>100.0%
+          </td>
+          <td><span class="badge" style="background:#008000;">On Target</span></td>
+        </tr>
+        <tr>
+          <td class="name">GHP_CodedClaims.Performer</td>
+          <td class='num'>1</td><td class='num'>0</td><td class='num'>0</td>
+          <td class="num total">1</td>
+          <td class="pct" style="color:#FF0000;">
+            <span class="dot" style="background:#FF0000;"></span>0.0%
+          </td>
+          <td><span class="badge" style="background:#FF0000;">Needs Attention</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-items">
+        <span><span class="dot" style="background:#008000;"></span>Success % &ge; 90% (On Target)</span>
+        <span><span class="dot" style="background:#FF0000;"></span>Success % &le; 89% (Needs Attention)</span>
+      </div>
+    </div>
+
+    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>
+  </div>
+</body>
+</html>
