@@ -66,10 +66,12 @@ class Settings:
     scope: str = "OR.Default"
 
     # --- Query filter -------------------------------------------------------
-    # Lower bound for the CreationTime filter (ISO-8601 UTC).
-    creation_time: str = "2025-03-22T00:00:00.000Z"
+    # Lower bound for the CreationTime filter (ISO-8601 UTC). There is no
+    # static default: the value is populated at runtime from the last_poll
+    # table (see ``main.run``), which is the single source of truth.
+    creation_time: str | None = None
     # Restrict to a single SourceType ("Schedule", "Manual", ...) or None for all.
-    source_type: str | None = "Schedule"
+    source_type: str | None = "Unattended"
 
     # --- Persistence --------------------------------------------------------
     # Supabase/Postgres connection string. When unset, persistence is skipped
@@ -107,7 +109,6 @@ class Settings:
         return cls(
             clients=clients,
             base_url=os.getenv("ORCHESTRATOR_BASE_URL", cls.base_url),
-            creation_time=os.getenv("MONITOR_CREATION_TIME", cls.creation_time),
             source_type=os.getenv("MONITOR_SOURCE_TYPE", cls.source_type),
             database_url=os.getenv("DATABASE_URL") or None,
         )

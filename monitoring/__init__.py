@@ -18,7 +18,13 @@ from .analytics import JobAnalysis, ReleaseStats, analyze_jobs
 from .auth import authenticate
 from .config import ClientConfig, Settings
 from .orchestrator import OrchestratorClient
-from .storage import load_metrics_jobs, persist_metrics_jobs, persist_snapshot
+from .storage import (
+    load_last_poll,
+    load_metrics_jobs,
+    persist_metrics_jobs,
+    persist_snapshot,
+    update_last_poll,
+)
 
 __all__ = [
     "Settings",
@@ -31,4 +37,6 @@ __all__ = [
     "persist_snapshot",
     "persist_metrics_jobs",
     "load_metrics_jobs",
+    "load_last_poll",
+    "update_last_poll",
 ]

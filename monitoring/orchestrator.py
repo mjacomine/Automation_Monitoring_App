@@ -28,7 +28,7 @@ class OrchestratorClient:
         """Build the OData ``$filter`` expression from configuration."""
         clauses = [f"CreationTime gt {self._settings.creation_time}"]
         if self._settings.source_type:
-            clauses.append(f"SourceType eq '{self._settings.source_type}'")
+            clauses.append(f"Type eq '{self._settings.source_type}'")
         return "(" + " and ".join(clauses) + ")"
 
     def get_jobs(self) -> dict:

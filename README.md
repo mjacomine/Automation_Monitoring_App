@@ -76,13 +76,15 @@ two most commonly changed filter values can also be set via the environment
 | ------------------------- | ---------------------------------------------------------------- |
 | `ORCHESTRATOR_CLIENT_ID`  | External Application client id (required).                       |
 | `ORCHESTRATOR_API_KEY`    | External Application client secret (required).                   |
-| `MONITOR_CREATION_TIME`   | Lower bound for `CreationTime` (ISO-8601 UTC).                   |
 | `MONITOR_SOURCE_TYPE`     | Filter by job source (`Schedule`, `Manual`, …).                  |
 | `success_threshold`       | Percent at/above which a process is "On Target" (default 90).    |
 | `jobs_url` / `token_url`  | Orchestrator + identity endpoints.                               |
 
-For example, to pull jobs created since a different date, set in `.env`:
+The `CreationTime` filter lower bound is **not** configured here — it is read
+from (and advanced in) the `last_poll` table on every run, so each run polls
+incrementally for jobs created since the previous run. To re-poll from an
+earlier point, update that row directly:
 
-```dotenv
-MONITOR_CREATION_TIME=2026-05-01T00:00:00.000Z
+```sql
+UPDATE last_poll SET last_poll_datetime = '2025-03-22 00:00:00+00';
 ```
