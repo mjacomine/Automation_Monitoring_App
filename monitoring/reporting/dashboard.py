@@ -6,8 +6,14 @@ Presentation concerns (colours, layout, copy) live here and nowhere else.
 
 The page is interactive: the per-job rows are embedded as JSON and the KPIs and
 success matrix are (re)computed client-side, so the Organization and Error Date
-dropdown filters re-aggregate the view without a server round-trip. The
-JavaScript aggregation mirrors :func:`~monitoring.analytics.analyze_jobs`.
+filters re-aggregate the view without a server round-trip. The JavaScript
+aggregation mirrors :func:`~monitoring.analytics.analyze_jobs`.
+
+Both filters share one collapsible, multi-select checkbox control: Organization
+is a flat checkbox list, Error Date a Year > Month > Day tree. Visual design
+uses CSS custom properties (design tokens) built from the brand palette —
+forest green (primary), slate blue (secondary), warm gold (accent) — plus a
+neutral gray scale, so colours are defined once in ``:root`` and reused.
 """
 
 from __future__ import annotations
@@ -18,167 +24,277 @@ from html import escape
 
 from ..analytics import JobAnalysis
 
-# Colour thresholds for the Success % indicator.
-SUCCESS_GREEN = "#008000"  # at/above the success threshold
-SUCCESS_RED = "#FF0000"    # below the success threshold
-
 
 # --- Page styling ----------------------------------------------------------
+# Design tokens in :root derive every colour from the three brand hues plus a
+# neutral scale; components reference the tokens so the palette is single-source.
 _CSS = """
+  :root {
+    /* Brand */
+    --brand: #467958;       /* primary  - forest green */
+    --brand-600: #3c6a4d;   /* hover / darker */
+    --brand-700: #2f5540;   /* darkest */
+    --brand-050: #eef3ef;   /* light green tint */
+    --slate: #82A2B1;       /* secondary - slate blue */
+    --slate-600: #5e8090;
+    --slate-700: #41606d;   /* dark slate for header fills (AA) */
+    --slate-050: #eef3f5;
+    --gold: #D4A842;        /* tertiary - warm gold accent */
+    --gold-600: #a87f23;    /* gold text on light (AA) */
+    --gold-050: #faf2dc;
+
+    /* Neutrals */
+    --canvas: #eef1ef;      /* app background */
+    --surface: #ffffff;     /* cards */
+    --surface-2: #f6f8f7;   /* zebra stripe */
+    --border: #e3e8e6;
+    --text: #1f2a30;
+    --text-muted: #5b6970;
+    --on-brand: #ffffff;
+
+    /* Semantic status (AA on white) */
+    --ok: #2e7d50;
+    --ok-strong: #246b45;   /* badge fill for white text */
+    --risk: #c0392b;
+
+    /* Effects */
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 1px 2px rgba(16,24,32,.05), 0 8px 24px rgba(16,24,32,.08);
+    --shadow-sm: 0 1px 3px rgba(16,24,32,.12);
+    --ring: 0 0 0 3px rgba(70,121,88,.35);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: #467958;
-    color: #1e293b;
-    padding: 40px 24px;
+    background: var(--canvas);
+    color: var(--text);
+    line-height: 1.5;
   }
-  .wrap { max-width: 1100px; margin: 0 auto; }
-  header { color: #f8fafc; margin-bottom: 28px; }
-  header h1 { font-size: 26px; font-weight: 600; letter-spacing: .3px; }
-  header .sub { color: #FFFFFF; font-size: 14px; margin-top: 6px; }
 
+  a:focus-visible, button:focus-visible, select:focus-visible,
+  input:focus-visible {
+    outline: none; box-shadow: var(--ring);
+  }
+
+  /* Top app bar */
+  .appbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--brand); color: var(--on-brand);
+    box-shadow: var(--shadow-sm);
+  }
+  .appbar-inner {
+    max-width: 1100px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 16px; font-weight: 700; letter-spacing: .3px;
+  }
+  .brand-mark {
+    width: 14px; height: 14px; border-radius: 4px; background: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212,168,66,.25);
+  }
+  .appbar-nav a {
+    color: var(--on-brand); text-decoration: none;
+    font-size: 14px; font-weight: 600; opacity: .92;
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .appbar-nav a:hover { background: rgba(255,255,255,.15); opacity: 1; }
+  .appbar-nav a:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
+
+  /* Layout */
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 48px; }
+  .page-head { margin-bottom: 24px; }
+  .page-head h1 {
+    font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: .2px;
+  }
+  .sub { color: var(--text-muted); font-size: 13.5px; margin-top: 6px; }
+
+  /* Filter bar */
   .filters {
-    display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;
-    background: #ffffff; border-radius: 12px; padding: 18px 20px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.25); margin-bottom: 28px;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow); margin-bottom: 24px;
   }
   .filters .field { display: flex; flex-direction: column; gap: 6px; }
   .filters label {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
-    color: #64748b; font-weight: 600;
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--text-muted); font-weight: 700;
   }
-  .filters select {
-    font-family: inherit; font-size: 14px; padding: 9px 12px;
-    border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc;
-    color: #0f172a; min-width: 220px; cursor: pointer;
-  }
-  .filters select:focus {
-    outline: none; border-color: #82A2B1;
-    box-shadow: 0 0 0 3px rgba(130,162,177,.35);
-  }
-  .filters .result-count {
+  .result-count {
     margin-left: auto; align-self: center;
-    color: #64748b; font-size: 13px; font-weight: 600;
+    color: var(--text-muted); font-size: 13px; font-weight: 600;
+    background: var(--slate-050); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 999px;
   }
 
-  /* Collapsible Year > Month > Day date filter */
-  .date-filter { position: relative; }
-  .date-button {
-    font-family: inherit; font-size: 14px; padding: 9px 12px;
-    border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc;
-    color: #0f172a; min-width: 220px; cursor: pointer; text-align: left;
+  /* Collapsible multi-select checkbox filter (Organization + Error Date) */
+  .cbf { position: relative; }
+  .cbf-button {
+    font-family: inherit; font-size: 14px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--text);
+    min-width: 220px; cursor: pointer; text-align: left;
     display: inline-flex; justify-content: space-between; align-items: center;
     gap: 8px;
   }
-  .date-button:focus {
-    outline: none; border-color: #82A2B1;
-    box-shadow: 0 0 0 3px rgba(130,162,177,.35);
+  .cbf-button:hover { border-color: var(--slate); }
+  .cbf-caret { color: var(--text-muted); font-size: 12px; }
+  .cbf-panel {
+    position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+    width: 280px; max-height: 340px; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px;
   }
-  .date-caret { color: #64748b; font-size: 12px; }
-  .date-panel {
-    position: absolute; z-index: 20; top: calc(100% + 6px); left: 0;
-    width: 260px; max-height: 320px; overflow-y: auto;
-    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
-    box-shadow: 0 10px 28px rgba(0,0,0,.30); padding: 6px;
-  }
-  .date-panel[hidden] { display: none; }
+  .cbf-panel[hidden] { display: none; }
   .tree-row {
-    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-    border-radius: 6px; cursor: pointer; font-size: 14px; color: #0f172a;
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+    border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--text);
     white-space: nowrap;
   }
-  .tree-row:hover { background: #f1f5f9; }
-  .tree-row.selected { background: #467958; color: #ffffff; font-weight: 600; }
-  .tree-row.selected .caret { color: #ffffff; }
-  .tree-children { padding-left: 16px; }
-  .caret { width: 14px; text-align: center; color: #64748b; font-size: 11px; }
+  .tree-row:hover { background: var(--brand-050); }
+  .tree-row.selected {
+    background: var(--gold-050); color: var(--gold-600); font-weight: 700;
+  }
+  .tree-children { padding-left: 18px; }
+  .caret { width: 14px; text-align: center; color: var(--text-muted); font-size: 11px; }
   .caret-spacer { width: 14px; display: inline-block; }
   .tree-check {
-    accent-color: #467958; width: 15px; height: 15px; cursor: pointer; flex: none;
+    accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer;
+    flex: none;
   }
   .check-spacer { width: 15px; display: inline-block; }
-  .tree-all { font-weight: 600; }
 
+  /* KPI cards */
   .kpis {
     display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 16px; margin-bottom: 28px;
+    gap: 16px; margin-bottom: 24px;
   }
   .kpi {
-    background: #ffffff; border-radius: 12px; padding: 20px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 3px solid var(--slate); border-radius: var(--radius);
+    padding: 18px 20px; box-shadow: var(--shadow);
   }
   .kpi .label {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
-    color: #64748b; font-weight: 600;
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--text-muted); font-weight: 700;
   }
-  .kpi .value { font-size: 30px; font-weight: 700; margin-top: 8px; }
+  .kpi .value {
+    font-size: 30px; font-weight: 800; margin-top: 8px;
+    color: var(--text); letter-spacing: -.5px;
+  }
+  .kpi-hero {
+    border-top-color: var(--gold);
+    background: linear-gradient(180deg, var(--gold-050), var(--surface) 62%);
+  }
+  .kpi-hero .value { font-size: 38px; }
+  .value.ok { color: var(--ok); }
+  .value.risk { color: var(--risk); }
+
+  /* Success matrix */
   .card {
-    background: #ffffff; border-radius: 12px; overflow: hidden;
-    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
   }
+  .table-scroll { overflow: auto; max-height: 72vh; }
   table { width: 100%; border-collapse: collapse; }
   thead th {
-    background: #82A2B1; color: #f1f5f9; text-align: right;
-    padding: 14px 16px; font-size: 12px; text-transform: uppercase;
-    letter-spacing: .6px; font-weight: 600;
+    position: sticky; top: 0; z-index: 1;
+    background: var(--slate-700); color: #ffffff; text-align: right;
+    padding: 13px 16px; font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: .6px; font-weight: 700;
   }
   thead th:first-child { text-align: left; }
   tbody td {
-    padding: 14px 16px; border-bottom: 1px solid #e2e8f0;
-    font-size: 15px; text-align: right;
+    padding: 13px 16px; border-bottom: 1px solid var(--border);
+    font-size: 14.5px; text-align: right;
   }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) { background: #f8fafc; }
-  td.name { text-align: left; font-weight: 600; color: #0f172a; }
-  td.num { color: #475569; font-variant-numeric: tabular-nums; }
-  td.total { font-weight: 700; color: #0f172a; }
+  tbody tr:nth-child(even) { background: var(--surface-2); }
+  tbody tr:hover { background: var(--brand-050); }
+  td.name { text-align: left; font-weight: 600; color: var(--text); }
+  td.num { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  td.total { font-weight: 700; color: var(--text); }
   td.pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+  td.pct.ok { color: var(--ok); }
+  td.pct.risk { color: var(--risk); }
+  .empty-row {
+    padding: 22px 16px !important; text-align: center !important;
+    color: var(--text-muted); font-size: 14px;
+  }
   .dot {
     display: inline-block; width: 9px; height: 9px; border-radius: 50%;
     margin-right: 7px; vertical-align: middle;
   }
+  .dot.ok { background: var(--ok); }
+  .dot.risk { background: var(--risk); }
   .badge {
-    color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px;
-    border-radius: 999px; text-transform: uppercase; letter-spacing: .5px;
-    white-space: nowrap;
+    display: inline-block; color: #fff; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; text-transform: uppercase;
+    letter-spacing: .5px; white-space: nowrap;
   }
+  .badge.ok { background: var(--ok-strong); }
+  .badge.risk { background: var(--risk); }
+
+  /* Legend */
   .legend {
-    background: #ffffff; color: #000000; margin-top: 18px;
-    border-radius: 12px; padding: 18px 20px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    box-shadow: var(--shadow); margin-top: 18px;
   }
-  .legend .legend-title {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
-    font-weight: 700; color: #000000; margin-bottom: 12px;
+  .legend-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+    font-weight: 700; color: var(--text-muted); margin-bottom: 12px;
   }
-  .legend .legend-items {
+  .legend-items {
     display: flex; gap: 24px; font-size: 13px; align-items: center;
+    color: var(--text); flex-wrap: wrap;
   }
   .legend .dot { width: 11px; height: 11px; }
-  footer { color: #64748b; font-size: 12px; margin-top: 22px; text-align: center; }
 
-  @media (max-width: 760px) {
+  footer {
+    color: var(--text-muted); font-size: 12px; margin-top: 24px;
+    text-align: center;
+  }
+
+  @media (max-width: 860px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
-    .filters select { min-width: 160px; }
+    .kpi-hero { grid-column: span 2; }
+  }
+  @media (max-width: 520px) {
+    .kpis { grid-template-columns: 1fr; }
+    .kpi-hero { grid-column: span 1; }
+    .filters .field, .cbf-button { width: 100%; min-width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
   }
 """
 
 
 # --- Client-side aggregation + filtering -----------------------------------
 # Mirrors analytics.analyze_jobs: group by ReleaseName, count by State, derive
-# success % and health against THRESHOLD, sort releases by volume. Reads the
-# RECORDS / STATES / THRESHOLD constants emitted just above it in the page.
+# success % and health against THRESHOLD. Reads the RECORDS / STATES / THRESHOLD
+# constants emitted just above it in the page.
 #
-# The Error Date filter is a collapsible Year > Month > Day tree with a checkbox
-# on every node for multi-select. Each checked box contributes a date prefix
-# ("YYYY", "YYYY-MM", or "YYYY-MM-DD"); a row matches if its date starts with
-# ANY selected prefix (the union). No selection means all dates.
+# Both filters are multi-select checkbox controls sharing one setup routine:
+#   * Organization - a flat checkbox list; a row matches if its org is in the
+#     selected set (empty set = all).
+#   * Error Date - a Year > Month > Day tree; each checked box contributes a
+#     date prefix ("YYYY", "YYYY-MM", or "YYYY-MM-DD") and a row matches if its
+#     date starts with ANY selected prefix (the union; empty = all).
+#
+# Status colour is applied via CSS classes (ok / risk) so the palette stays in
+# the design tokens; the healthy/at-risk decision itself is unchanged.
 _DASHBOARD_JS = """
 const $ = function (id) { return document.getElementById(id); };
-const GREEN = "#008000", RED = "#FF0000";
 const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
+var selectedOrgs = [];   // checked organization codes
 var selectedDates = [];  // checked prefixes: "YYYY" | "YYYY-MM" | "YYYY-MM-DD"
 
 function esc(s) {
@@ -192,12 +308,13 @@ function distinct(values) {
   })));
 }
 
-function fillSelect(sel, values, allLabel) {
-  var html = ['<option value="">' + allLabel + "</option>"];
-  values.forEach(function (v) {
-    html.push('<option value="' + esc(v) + '">' + esc(v) + "</option>");
+function checkedValues(panelId) {
+  var boxes = $(panelId).querySelectorAll(".tree-check");
+  var out = [];
+  Array.prototype.forEach.call(boxes, function (b) {
+    if (b.checked) out.push(b.getAttribute("data-value"));
   });
-  sel.innerHTML = html.join("");
+  return out;
 }
 
 function dateLabel(prefix) {
@@ -206,6 +323,16 @@ function dateLabel(prefix) {
   if (p.length === 1) return p[0];
   if (p.length === 2) return MONTHS[parseInt(p[1], 10) - 1] + " " + p[0];
   return p[1] + "/" + p[2] + "/" + p[0];  // MM/dd/yyyy
+}
+
+function renderOrgList(orgs) {
+  var html = "";
+  orgs.forEach(function (o) {
+    html += '<div class="tree-row">' +
+      '<input type="checkbox" class="tree-check" data-value="' + esc(o) + '">' +
+      '<span class="tree-label">' + esc(o) + "</span></div>";
+  });
+  return html;
 }
 
 function buildDateTree(dates) {
@@ -251,13 +378,24 @@ function renderDateTree(tree) {
   return html;
 }
 
+function summarize(values, mapper, allLabel) {
+  if (values.length === 0) return allLabel;
+  if (values.length === 1) return mapper(values[0]);
+  return values.length + " selected";
+}
+
+function updateOrgButton() {
+  $("org-button").innerHTML =
+    esc(summarize(selectedOrgs, function (v) { return v; }, "All Organizations")) +
+    ' <span class="cbf-caret">&#9662;</span>';
+  var allRow = $("org-panel").querySelector(".tree-all");
+  if (allRow) allRow.classList.toggle("selected", selectedOrgs.length === 0);
+}
+
 function updateDateButton() {
-  var label;
-  if (selectedDates.length === 0) label = "All Dates";
-  else if (selectedDates.length === 1) label = dateLabel(selectedDates[0]);
-  else label = selectedDates.length + " selected";
-  $("date-button").innerHTML = esc(label) +
-    ' <span class="date-caret">&#9662;</span>';
+  $("date-button").innerHTML =
+    esc(summarize(selectedDates, dateLabel, "All Dates")) +
+    ' <span class="cbf-caret">&#9662;</span>';
   var allRow = $("date-panel").querySelector(".tree-all");
   if (allRow) allRow.classList.toggle("selected", selectedDates.length === 0);
 }
@@ -270,19 +408,24 @@ function dateMatches(d) {
   return false;
 }
 
+function refreshOrgFilter() {
+  selectedOrgs = checkedValues("org-panel");
+  updateOrgButton();
+  render();
+}
+
 function refreshDateFilter() {
-  var boxes = $("date-panel").querySelectorAll(".tree-check");
-  selectedDates = [];
-  Array.prototype.forEach.call(boxes, function (b) {
-    if (b.checked) selectedDates.push(b.getAttribute("data-value"));
-  });
+  selectedDates = checkedValues("date-panel");
   updateDateButton();
   render();
 }
 
 function updateSummary() {
-  var org = $("filter-org").value;
-  var orgLabel = org === "" ? "All Organizations" : org;
+  var orgText;
+  if (selectedOrgs.length === 0) orgText = "All Organizations";
+  else if (selectedOrgs.length <= 3) orgText = selectedOrgs.slice().sort().join(", ");
+  else orgText = selectedOrgs.length + " selected";
+
   var dateText;
   if (selectedDates.length === 0) {
     dateText = "All Dates";
@@ -292,13 +435,13 @@ function updateSummary() {
     dateText = selectedDates.length + " dates selected";
   }
   $("filter-summary").textContent =
-    "Filters: Organization = " + orgLabel + "  \\u00b7  Error Date = " + dateText;
+    "Filters: Organization = " + orgText + "  \\u00b7  Error Date = " + dateText;
 }
 
 function render() {
-  var org = $("filter-org").value;
   var rows = RECORDS.filter(function (r) {
-    return (org === "" || r.o === org) && dateMatches(r.d);
+    return (selectedOrgs.length === 0 || selectedOrgs.indexOf(r.o) !== -1) &&
+           dateMatches(r.d);
   });
 
   var table = {};
@@ -317,7 +460,8 @@ function render() {
     return { name: name, counts: counts, total: total,
              successful: successful, pct: pct, healthy: pct >= THRESHOLD };
   });
-  releases.sort(function (a, b) { return b.total - a.total; });
+  // Sort processes alphabetically by ReleaseName, descending (Z -> A).
+  releases.sort(function (a, b) { return b.name.localeCompare(a.name); });
 
   var grandTotal = releases.reduce(function (a, r) { return a + r.total; }, 0);
   var grandSucc = releases.reduce(function (a, r) { return a + r.successful; }, 0);
@@ -328,16 +472,14 @@ function render() {
   $("kpi-total").textContent = rows.length;
   var succEl = $("kpi-success");
   succEl.textContent = overall.toFixed(1) + "%";
-  succEl.style.color = overall >= THRESHOLD ? GREEN : RED;
+  succEl.className = "value " + (overall >= THRESHOLD ? "ok" : "risk");
   $("kpi-ontarget").textContent = healthy;
-  $("kpi-ontarget").style.color = GREEN;
   $("kpi-atrisk").textContent = releases.length - healthy;
-  $("kpi-atrisk").style.color = RED;
 
   var out = [];
   releases.forEach(function (r) {
-    var color = r.pct >= THRESHOLD ? GREEN : RED;
-    var badge = r.healthy ? "On Target" : "Needs Attention";
+    var cls = r.pct >= THRESHOLD ? "ok" : "risk";
+    var badge = r.healthy ? "&#10003; On Target" : "&#9650; Needs Attention";
     var cells = "";
     STATES.forEach(function (s) {
       cells += "<td class='num'>" + (r.counts[s] || 0) + "</td>";
@@ -345,39 +487,34 @@ function render() {
     out.push(
       '<tr><td class="name">' + esc(r.name) + "</td>" + cells +
       '<td class="num total">' + r.total + "</td>" +
-      '<td class="pct" style="color:' + color + ';"><span class="dot" style="background:' +
-      color + ';"></span>' + r.pct.toFixed(1) + "%</td>" +
-      '<td><span class="badge" style="background:' + color + ';">' + badge + "</span></td></tr>"
+      '<td class="pct ' + cls + '"><span class="dot ' + cls + '"></span>' +
+      r.pct.toFixed(1) + "%</td>" +
+      '<td><span class="badge ' + cls + '">' + badge + "</span></td></tr>"
     );
   });
   if (out.length === 0) {
     out.push('<tr><td colspan="' + (STATES.length + 4) +
-      '" style="padding:18px;text-align:left;color:#64748b;">' +
-      "No jobs match the selected filters.</td></tr>");
+      '" class="empty-row">No jobs match the selected filters.</td></tr>');
   }
   $("table-body").innerHTML = out.join("");
   $("result-count").textContent = rows.length + " of " + RECORDS.length + " jobs";
   updateSummary();
 }
 
-(function init() {
-  var orgs = distinct(RECORDS.map(function (r) { return r.o; })).sort();
-  fillSelect($("filter-org"), orgs, "All Organizations");
-  $("filter-org").addEventListener("change", render);
-
-  var dates = distinct(RECORDS.map(function (r) { return r.d; }));
-  $("date-tree").innerHTML = renderDateTree(buildDateTree(dates));
-
-  var button = $("date-button");
-  var panel = $("date-panel");
-  button.addEventListener("click", function (e) {
-    e.stopPropagation();
+// Wire one collapsible checkbox panel: open/close, outside-click, caret
+// expand/collapse, the "All" reset row, and checkbox/label toggling.
+function setupPanel(buttonId, panelId, onRefresh) {
+  var button = $(buttonId), panel = $(panelId);
+  button.addEventListener("click", function () {
     panel.hidden = !panel.hidden;
+    button.setAttribute("aria-expanded", String(!panel.hidden));
   });
   document.addEventListener("click", function (e) {
-    if (!e.target.closest(".date-filter")) panel.hidden = true;
+    if (!panel.hidden && !panel.contains(e.target) && !button.contains(e.target)) {
+      panel.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+    }
   });
-
   panel.addEventListener("click", function (e) {
     var caret = e.target.closest(".caret");
     if (caret) {
@@ -387,25 +524,34 @@ function render() {
         children.style.display = open ? "none" : "block";
         caret.innerHTML = open ? "&#9656;" : "&#9662;";
       }
-      e.stopPropagation();
       return;
     }
     if (e.target.closest(".tree-all")) {
       var boxes = panel.querySelectorAll(".tree-check");
       Array.prototype.forEach.call(boxes, function (b) { b.checked = false; });
-      refreshDateFilter();
+      onRefresh();
       return;
     }
     if (e.target.classList.contains("tree-check")) {
-      refreshDateFilter();  // native toggle already applied
+      onRefresh();  // native toggle already applied
       return;
     }
     var row = e.target.closest(".tree-row");
     if (row) {
       var cb = row.querySelector(".tree-check");
-      if (cb) { cb.checked = !cb.checked; refreshDateFilter(); }
+      if (cb) { cb.checked = !cb.checked; onRefresh(); }
     }
   });
+}
+
+(function init() {
+  var orgs = distinct(RECORDS.map(function (r) { return r.o; })).sort();
+  $("org-list").innerHTML = renderOrgList(orgs);
+  setupPanel("org-button", "org-panel", refreshOrgFilter);
+
+  var dates = distinct(RECORDS.map(function (r) { return r.d; }));
+  $("date-tree").innerHTML = renderDateTree(buildDateTree(dates));
+  setupPanel("date-button", "date-panel", refreshDateFilter);
 
   render();
 })();
@@ -433,7 +579,9 @@ def render_dashboard(
     threshold = analysis.success_threshold
     states = analysis.states
 
-    state_headers = "".join(f"<th>{escape(s)}</th>" for s in states)
+    state_headers = "".join(
+        f'<th scope="col">{escape(s)}</th>' for s in states
+    )
 
     # Compact, minimal per-row payload for the browser: o=org, r=release,
     # s=state, d=error date. "</" is escaped so a value can't close the script.
@@ -459,30 +607,53 @@ def render_dashboard(
         "<style>" + _CSS + "</style>\n"
         "</head>\n"
         "<body>\n"
-        '  <div class="wrap">\n'
-        "    <header>\n"
-        "      <h1>RPA Job Success Dashboard</h1>\n"
+        '  <header class="appbar">\n'
+        '    <div class="appbar-inner">\n'
+        '      <div class="brand"><span class="brand-mark"></span>'
+        "RPA Operations</div>\n"
+        '      <nav class="appbar-nav"><a href="index.html">'
+        "&larr; Home</a></nav>\n"
+        "    </div>\n"
+        "  </header>\n"
+        '  <main class="wrap">\n'
+        '    <div class="page-head">\n'
+        "      <h1>Job Success Dashboard</h1>\n"
     )
 
     header_sub = (
         f'      <div class="sub">Last Refreshed {escape(stamp)} '
         f'&nbsp;&bull;&nbsp; <span id="filter-summary">Filters: '
         f"{escape(filter_desc)}</span></div>\n"
-        "    </header>\n"
+        "    </div>\n"
     )
 
     controls = (
-        '\n    <div class="filters">\n'
+        '\n    <section class="filters" aria-label="Filters">\n'
         '      <div class="field">\n'
-        '        <label for="filter-org">Organization</label>\n'
-        '        <select id="filter-org"></select>\n'
+        '        <label id="org-label">Organization</label>\n'
+        '        <div class="cbf">\n'
+        '          <button type="button" class="cbf-button" id="org-button"'
+        ' aria-haspopup="true" aria-expanded="false"'
+        ' aria-label="Filter by organization">'
+        'All Organizations <span class="cbf-caret">&#9662;</span></button>\n'
+        '          <div class="cbf-panel" id="org-panel" hidden'
+        ' role="group" aria-label="Organization filter">\n'
+        '            <div class="tree-row tree-all selected">'
+        '<span class="check-spacer"></span>'
+        '<span class="tree-label">All Organizations</span></div>\n'
+        '            <div id="org-list"></div>\n'
+        "          </div>\n"
+        "        </div>\n"
         "      </div>\n"
         '      <div class="field">\n'
-        "        <label>Error Date</label>\n"
-        '        <div class="date-filter">\n'
-        '          <button type="button" class="date-button" id="date-button">'
-        'All Dates <span class="date-caret">&#9662;</span></button>\n'
-        '          <div class="date-panel" id="date-panel" hidden>\n'
+        '        <label id="date-label">Error Date</label>\n'
+        '        <div class="cbf">\n'
+        '          <button type="button" class="cbf-button" id="date-button"'
+        ' aria-haspopup="true" aria-expanded="false"'
+        ' aria-label="Filter by error date">'
+        'All Dates <span class="cbf-caret">&#9662;</span></button>\n'
+        '          <div class="cbf-panel" id="date-panel" hidden'
+        ' role="group" aria-label="Error date filter">\n'
         '            <div class="tree-row tree-all selected">'
         '<span class="caret-spacer"></span><span class="check-spacer"></span>'
         '<span class="tree-label">All Dates</span></div>\n'
@@ -491,50 +662,53 @@ def render_dashboard(
         "        </div>\n"
         "      </div>\n"
         '      <div class="result-count" id="result-count"></div>\n'
-        "    </div>\n"
-        '\n    <div class="kpis">\n'
+        "    </section>\n"
+        '\n    <section class="kpis" aria-label="Key metrics">\n'
         '      <div class="kpi"><div class="label">Unique Automations</div>'
         '<div class="value" id="kpi-automations">0</div></div>\n'
         '      <div class="kpi"><div class="label">Total Jobs</div>'
         '<div class="value" id="kpi-total">0</div></div>\n'
-        '      <div class="kpi"><div class="label">Overall Success</div>'
+        '      <div class="kpi kpi-hero"><div class="label">Overall Success</div>'
         '<div class="value" id="kpi-success">0%</div></div>\n'
         '      <div class="kpi"><div class="label">Processes On Target</div>'
-        '<div class="value" id="kpi-ontarget">0</div></div>\n'
+        '<div class="value ok" id="kpi-ontarget">0</div></div>\n'
         '      <div class="kpi"><div class="label">Processes At Risk</div>'
-        '<div class="value" id="kpi-atrisk">0</div></div>\n'
-        "    </div>\n"
+        '<div class="value risk" id="kpi-atrisk">0</div></div>\n'
+        "    </section>\n"
     )
 
     table_part = (
-        '\n    <div class="card">\n'
-        "      <table>\n"
-        "        <thead>\n"
-        "          <tr>\n"
-        "            <th>Process (ReleaseName)</th>\n"
-        f"            {state_headers}\n"
-        "            <th>Total</th>\n"
-        "            <th>Success %</th>\n"
-        "            <th>Status</th>\n"
-        "          </tr>\n"
-        "        </thead>\n"
-        '        <tbody id="table-body"></tbody>\n'
-        "      </table>\n"
-        "    </div>\n"
+        '\n    <section class="card table-card"'
+        ' aria-label="Process success matrix">\n'
+        '      <div class="table-scroll">\n'
+        "        <table>\n"
+        "          <thead>\n"
+        "            <tr>\n"
+        '              <th scope="col">Process (ReleaseName)</th>\n'
+        f"              {state_headers}\n"
+        '              <th scope="col">Total</th>\n'
+        '              <th scope="col">Success %</th>\n'
+        '              <th scope="col">Status</th>\n'
+        "            </tr>\n"
+        "          </thead>\n"
+        '          <tbody id="table-body"></tbody>\n'
+        "        </table>\n"
+        "      </div>\n"
+        "    </section>\n"
     )
 
     legend = (
-        '\n    <div class="legend">\n'
+        '\n    <section class="legend" aria-label="Legend">\n'
         '      <div class="legend-title">Legend</div>\n'
         '      <div class="legend-items">\n'
-        f'        <span><span class="dot" style="background:{SUCCESS_GREEN};"></span>'
+        '        <span><span class="dot ok"></span>'
         f"Success % &ge; {threshold:.0f}% (On Target)</span>\n"
-        f'        <span><span class="dot" style="background:{SUCCESS_RED};"></span>'
+        '        <span><span class="dot risk"></span>'
         f"Success % &lt; {threshold:.0f}% (Needs Attention)</span>\n"
         "      </div>\n"
-        "    </div>\n"
+        "    </section>\n"
         "\n    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>\n"
-        "  </div>\n"
+        "  </main>\n"
     )
 
     data_script = (

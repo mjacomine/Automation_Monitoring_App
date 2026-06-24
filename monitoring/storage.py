@@ -342,11 +342,14 @@ def load_metrics_jobs(settings: Settings) -> dict | None:
     Returns a dict with a ``value`` list of job-like records carrying
     ``ReleaseName`` / ``State`` (mapped back from ``job_name`` / ``job_state``)
     so it can be fed straight into :func:`~monitoring.analytics.analyze_jobs`,
-    plus ``Organization`` (the ``organization_id`` / client code) and
-    ``ErrorDate`` (the date portion of ``error_datetime``) which power the
-    dashboard's interactive filters. This lets the report reflect exactly what
-    is stored in the table — the accumulated, deduplicated set across runs —
-    rather than only the latest live API call.
+    plus ``Organization`` and ``ErrorDate`` (the date portion of
+    ``error_datetime``) which power the dashboard's interactive filters.
+
+    ``f_auto_metrics_jobs`` is the fact table; ``Organization`` is resolved to
+    the formal ``organization_name`` from the ``d_organizations`` dimension via
+    an inner join on ``organization_id``, so the filter shows friendly names.
+    This lets the report reflect exactly what is stored — the accumulated,
+    deduplicated set across runs — rather than only the latest live API call.
 
     Returns ``None`` when no ``DATABASE_URL`` is configured, so callers can fall
     back to the live payload during local development.
@@ -365,20 +368,23 @@ def load_metrics_jobs(settings: Settings) -> dict | None:
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT organization_id, job_name, job_state, error_datetime "
-                "FROM f_auto_metrics_jobs"
+                "SELECT o.organization_name, amj.job_name, amj.job_state, "
+                "amj.error_datetime "
+                "FROM f_auto_metrics_jobs amj "
+                "INNER JOIN d_organizations o "
+                "ON amj.organization_id = o.organization_id"
             )
             rows = cur.fetchall()
 
     value = [
         {
-            "Organization": org,
+            "Organization": org_name,
             "ReleaseName": name,
             "State": state,
             # Date portion only — the filter groups by calendar day, not time.
             "ErrorDate": err_dt.date().isoformat() if err_dt else None,
         }
-        for org, name, state, err_dt in rows
+        for org_name, name, state, err_dt in rows
     ]
     return {"value": value}
 
