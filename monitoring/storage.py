@@ -263,6 +263,7 @@ METRICS_FIELD_MAP: dict[str, str] = {
     "Key": "job_key",
     "ReleaseName": "job_name",
     "State": "job_state",
+    "CreationTime": "error_datetime",
 }
 
 # Target column type per mapped field, used to normalise values before insert.
@@ -270,6 +271,7 @@ _METRICS_FIELD_TYPES: dict[str, str] = {
     "Key": "text",
     "ReleaseName": "text",
     "State": "text",
+    "CreationTime": "timestamptz",
 }
 
 
