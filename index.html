@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automation Monitoring</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #467958;
+    color: #1e293b;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  header { color: #f8fafc; margin-bottom: 28px; }
+  header h1 { font-size: 26px; font-weight: 600; letter-spacing: .3px; }
+  header .sub { color: #FFFFFF; font-size: 14px; margin-top: 6px; }
+
+  /* Hero card */
+  .hero {
+    background: #ffffff; border-radius: 12px; padding: 48px 40px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    margin-bottom: 28px;
+  }
+  .hero .eyebrow {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    color: #64748b; font-weight: 600;
+  }
+  .hero h2 {
+    font-size: 34px; font-weight: 700; color: #0f172a;
+    margin-top: 10px; line-height: 1.2;
+  }
+  .hero p {
+    font-size: 16px; color: #475569; margin-top: 14px; max-width: 640px;
+    line-height: 1.6;
+  }
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-top: 28px; padding: 14px 26px;
+    background: #008000; color: #ffffff; text-decoration: none;
+    font-size: 15px; font-weight: 600; letter-spacing: .3px;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(0,128,0,.35);
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .cta:hover {
+    background: #006b00; transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,128,0,.45);
+  }
+  .cta .arrow { font-size: 18px; line-height: 1; }
+
+  /* Feature cards */
+  .cards {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  .card {
+    background: #ffffff; border-radius: 12px; padding: 24px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  }
+  .card .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    color: #64748b; font-weight: 600;
+  }
+  .card h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 8px; }
+  .card p { font-size: 14px; color: #475569; margin-top: 8px; line-height: 1.55; }
+  .accent-bar { height: 4px; width: 44px; background: #82A2B1; border-radius: 999px; }
+
+  footer { color: #64748b; font-size: 12px; margin-top: 22px; text-align: center; }
+
+  @media (max-width: 760px) {
+    .cards { grid-template-columns: 1fr; }
+    .hero { padding: 36px 26px; }
+    .hero h2 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Automation Monitoring</h1>
+      <div class="sub">UiPath Orchestrator &mdash; RPA operations portal</div>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">Production Monitoring</div>
+      <h2>Keep every automation on target.</h2>
+      <p>
+        This portal tracks UiPath Orchestrator job outcomes across all monitored
+        clients, persists them for trend analysis, and surfaces process health at
+        a glance. Open the live dashboard to review job success rates, volumes,
+        and processes that need attention.
+      </p>
+      <a class="cta" href="dashboard.html">
+        Open Dashboard <span class="arrow">&rarr;</span>
+      </a>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <div class="accent-bar"></div>
+        <div class="label" style="margin-top:14px;">Success Analytics</div>
+        <h3>Process Health</h3>
+        <p>Per-process success rates with On&nbsp;Target / Needs&nbsp;Attention
+           status against your success threshold.</p>
+      </div>
+      <div class="card">
+        <div class="accent-bar"></div>
+        <div class="label" style="margin-top:14px;">Multi-Client</div>
+        <h3>Every Environment</h3>
+        <p>One view across all configured Orchestrator clients, each job
+           attributed to the client it ran in.</p>
+      </div>
+      <div class="card">
+        <div class="accent-bar"></div>
+        <div class="label" style="margin-top:14px;">Incremental</div>
+        <h3>Always Current</h3>
+        <p>Continuous incremental polling keeps the stored dataset up to date
+           without re-scanning history.</p>
+      </div>
+    </section>
+
+    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>
+  </div>
+</body>
+</html>

@@ -339,12 +339,14 @@ def persist_metrics_jobs(
 def load_metrics_jobs(settings: Settings) -> dict | None:
     """Read all stored rows from ``f_auto_metrics_jobs`` as an Orchestrator-shaped payload.
 
-    Returns a dict with a ``value`` list of job-like records keyed on
-    ``ReleaseName`` / ``State`` (mapped back from ``job_name`` / ``job_state``),
-    so it can be fed straight into :func:`~monitoring.analytics.analyze_jobs`.
-    This lets the report reflect exactly what is stored in the table — the
-    accumulated, deduplicated set across runs — rather than only the latest
-    live API call.
+    Returns a dict with a ``value`` list of job-like records carrying
+    ``ReleaseName`` / ``State`` (mapped back from ``job_name`` / ``job_state``)
+    so it can be fed straight into :func:`~monitoring.analytics.analyze_jobs`,
+    plus ``Organization`` (the ``organization_id`` / client code) and
+    ``ErrorDate`` (the date portion of ``error_datetime``) which power the
+    dashboard's interactive filters. This lets the report reflect exactly what
+    is stored in the table — the accumulated, deduplicated set across runs —
+    rather than only the latest live API call.
 
     Returns ``None`` when no ``DATABASE_URL`` is configured, so callers can fall
     back to the live payload during local development.
@@ -362,10 +364,22 @@ def load_metrics_jobs(settings: Settings) -> dict | None:
 
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT job_name, job_state FROM f_auto_metrics_jobs")
+            cur.execute(
+                "SELECT organization_id, job_name, job_state, error_datetime "
+                "FROM f_auto_metrics_jobs"
+            )
             rows = cur.fetchall()
 
-    value = [{"ReleaseName": name, "State": state} for name, state in rows]
+    value = [
+        {
+            "Organization": org,
+            "ReleaseName": name,
+            "State": state,
+            # Date portion only — the filter groups by calendar day, not time.
+            "ErrorDate": err_dt.date().isoformat() if err_dt else None,
+        }
+        for org, name, state, err_dt in rows
+    ]
     return {"value": value}
 
 

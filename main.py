@@ -149,7 +149,9 @@ def run(settings: Settings) -> int:
     print(render_console(analysis))
 
     # 7. Report — HTML dashboard ------------------------------------------
-    html = render_dashboard(analysis, report_desc)
+    html = render_dashboard(
+        analysis, report_desc, records=analysis_source.get("value", [])
+    )
     output_path = _write_dashboard(settings, html)
     print(f"\nDashboard written to: {output_path}")
     if settings.open_dashboard:
