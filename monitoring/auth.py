@@ -9,15 +9,16 @@ from __future__ import annotations
 
 import requests
 
-from .config import Settings
+from .config import ClientConfig, Settings
 
 
-def authenticate(settings: Settings) -> str:
-    """Exchange client credentials for an OAuth2 bearer access token.
+def authenticate(settings: Settings, client: ClientConfig) -> str:
+    """Exchange a client's credentials for an OAuth2 bearer access token.
 
     Args:
-        settings: Application configuration carrying the credentials and
-            token endpoint.
+        settings: Application configuration carrying the shared token endpoint
+            and scope.
+        client: The Orchestrator client whose credentials to authenticate.
 
     Returns:
         The bearer access token string.
@@ -28,8 +29,8 @@ def authenticate(settings: Settings) -> str:
     """
     payload = {
         "grant_type": "client_credentials",
-        "client_id": settings.client_id,
-        "client_secret": settings.client_secret,
+        "client_id": client.client_id,
+        "client_secret": client.client_secret,
         "scope": settings.scope,
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}

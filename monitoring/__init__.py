@@ -16,12 +16,13 @@ from __future__ import annotations
 
 from .analytics import JobAnalysis, ReleaseStats, analyze_jobs
 from .auth import authenticate
-from .config import Settings
+from .config import ClientConfig, Settings
 from .orchestrator import OrchestratorClient
-from .storage import persist_metrics_jobs, persist_snapshot
+from .storage import load_metrics_jobs, persist_metrics_jobs, persist_snapshot
 
 __all__ = [
     "Settings",
+    "ClientConfig",
     "authenticate",
     "OrchestratorClient",
     "analyze_jobs",
@@ -29,4 +30,5 @@ __all__ = [
     "ReleaseStats",
     "persist_snapshot",
     "persist_metrics_jobs",
+    "load_metrics_jobs",
 ]

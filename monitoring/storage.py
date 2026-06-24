@@ -308,6 +308,39 @@ def persist_metrics_jobs(settings: Settings, payload: dict) -> int | None:
     return count
 
 
+def load_metrics_jobs(settings: Settings) -> dict | None:
+    """Read all stored rows from ``auto_metrics_jobs`` as an Orchestrator-shaped payload.
+
+    Returns a dict with a ``value`` list of job-like records keyed on
+    ``ReleaseName`` / ``State`` (mapped back from ``job_name`` / ``job_state``),
+    so it can be fed straight into :func:`~monitoring.analytics.analyze_jobs`.
+    This lets the report reflect exactly what is stored in the table — the
+    accumulated, deduplicated set across runs — rather than only the latest
+    live API call.
+
+    Returns ``None`` when no ``DATABASE_URL`` is configured, so callers can fall
+    back to the live payload during local development.
+
+    Raises:
+        RuntimeError: if a ``DATABASE_URL`` is set but ``psycopg`` is missing.
+    """
+    if not settings.database_url:
+        return None
+    if psycopg is None:
+        raise RuntimeError(
+            "DATABASE_URL is set but psycopg is not installed. "
+            "Run: pip install -r requirements.txt"
+        )
+
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT job_name, job_state FROM auto_metrics_jobs")
+            rows = cur.fetchall()
+
+    value = [{"ReleaseName": name, "State": state} for name, state in rows]
+    return {"value": value}
+
+
 if __name__ == "__main__":
     # Utility: `python -m monitoring.storage --print-schema` dumps the DDL so
     # the database can be configured by hand (e.g. in the Supabase SQL editor).

@@ -11,14 +11,17 @@ from __future__ import annotations
 
 import requests
 
-from .config import Settings
+from .config import ClientConfig, Settings
 
 
 class OrchestratorClient:
-    """Thin, authenticated wrapper over the Orchestrator Jobs endpoint."""
+    """Thin, authenticated wrapper over one client's Orchestrator Jobs endpoint."""
 
-    def __init__(self, settings: Settings, access_token: str) -> None:
+    def __init__(
+        self, settings: Settings, client: ClientConfig, access_token: str
+    ) -> None:
         self._settings = settings
+        self._client = client
         self._access_token = access_token
 
     def build_filter(self) -> str:
@@ -41,7 +44,7 @@ class OrchestratorClient:
         params = {"$filter": self.build_filter()}
 
         response = requests.get(
-            self._settings.jobs_url,
+            self._client.jobs_url(self._settings.base_url),
             headers=headers,
             params=params,
             timeout=self._settings.request_timeout,
