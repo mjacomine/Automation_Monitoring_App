@@ -3,157 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RPA Operations</title>
-<style>
-  /* Design tokens — shared with the dashboard (brand palette + neutrals). */
-  :root {
-    --brand: #467958;
-    --brand-600: #3c6a4d;
-    --brand-700: #2f5540;
-    --brand-050: #eef3ef;
-    --slate: #82A2B1;
-    --slate-600: #5e8090;
-    --gold: #D4A842;
-    --gold-600: #a87f23;
-    --gold-050: #faf2dc;
-
-    --canvas: #eef1ef;
-    --surface: #ffffff;
-    --border: #e3e8e6;
-    --text: #1f2a30;
-    --text-muted: #5b6970;
-    --on-brand: #ffffff;
-
-    --radius: 14px;
-    --shadow: 0 1px 2px rgba(16,24,32,.05), 0 8px 24px rgba(16,24,32,.08);
-    --shadow-sm: 0 1px 3px rgba(16,24,32,.12);
-    --ring: 0 0 0 3px rgba(70,121,88,.35);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--canvas);
-    color: var(--text);
-    min-height: 100vh;
-    line-height: 1.5;
-  }
-  a:focus-visible, button:focus-visible { outline: none; box-shadow: var(--ring); }
-
-  /* Top app bar (matches the dashboard) */
-  .appbar {
-    background: var(--brand); color: var(--on-brand);
-    box-shadow: var(--shadow-sm);
-  }
-  .appbar-inner {
-    max-width: 1100px; margin: 0 auto; padding: 14px 24px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .brand {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 16px; font-weight: 700; letter-spacing: .3px;
-  }
-  .brand-mark {
-    width: 14px; height: 14px; border-radius: 4px; background: var(--gold);
-    box-shadow: 0 0 0 3px rgba(212,168,66,.25);
-  }
-  .appbar-nav a {
-    color: var(--on-brand); text-decoration: none;
-    font-size: 14px; font-weight: 600; opacity: .92;
-    padding: 6px 12px; border-radius: 999px;
-  }
-  .appbar-nav a:hover { background: rgba(255,255,255,.15); opacity: 1; }
-  .appbar-nav a:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
-
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 48px; }
-
-  /* Hero */
-  .hero {
-    background: var(--surface); border: 1px solid var(--border);
-    border-top: 4px solid var(--gold);
-    border-radius: var(--radius); padding: 48px 40px;
-    box-shadow: var(--shadow); margin-bottom: 24px;
-  }
-  .hero .eyebrow {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
-    color: var(--gold-600); font-weight: 700;
-  }
-  .hero h1 {
-    font-size: 34px; font-weight: 800; color: var(--text);
-    margin-top: 10px; line-height: 1.15; letter-spacing: -.3px;
-  }
-  .hero p {
-    font-size: 16px; color: var(--text-muted); margin-top: 14px;
-    max-width: 640px; line-height: 1.6;
-  }
-  .cta {
-    display: inline-flex; align-items: center; gap: 10px;
-    margin-top: 28px; padding: 14px 26px;
-    background: var(--brand); color: var(--on-brand); text-decoration: none;
-    font-size: 15px; font-weight: 700; letter-spacing: .3px;
-    border-radius: 999px; box-shadow: 0 4px 12px rgba(70,121,88,.30);
-    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-  }
-  .cta:hover {
-    background: var(--brand-600); transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(70,121,88,.40);
-  }
-  .cta .arrow { font-size: 18px; line-height: 1; }
-
-  /* Feature cards */
-  .cards {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 16px; margin-bottom: 24px;
-  }
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow);
-  }
-  .card .label {
-    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
-    color: var(--text-muted); font-weight: 700; margin-top: 14px;
-  }
-  .card h2 {
-    font-size: 18px; font-weight: 700; color: var(--text); margin-top: 8px;
-  }
-  .card p {
-    font-size: 14px; color: var(--text-muted); margin-top: 8px; line-height: 1.55;
-  }
-  .accent-bar { height: 4px; width: 44px; border-radius: 999px; background: var(--slate); }
-  .accent-bar.gold { background: var(--gold); }
-
-  footer { color: var(--text-muted); font-size: 12px; margin-top: 22px; text-align: center; }
-
-  @media (max-width: 760px) {
-    .cards { grid-template-columns: 1fr; }
-    .hero { padding: 36px 26px; }
-    .hero h1 { font-size: 28px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
-  }
-</style>
+<title>Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="appbar">
     <div class="appbar-inner">
       <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
-      <nav class="appbar-nav"><a href="dashboard.html">Dashboard &rarr;</a></nav>
+      <nav class="appbar-nav">
+        <a href="index.html" aria-current="page">Home</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="trends.html">Trending</a>
+        <a href="admin.html" id="nav-admin" hidden>Admin</a>
+        <button type="button" id="signout" hidden>Sign out</button>
+      </nav>
     </div>
   </header>
 
   <main class="wrap">
     <section class="hero">
-      <div class="eyebrow">Production Monitoring</div>
+      <div class="eyebrow">Job Monitoring</div>
       <h1>Keep every automation on target.</h1>
       <p>
         This portal tracks UiPath Orchestrator job outcomes across all monitored
-        clients, persists them for trend analysis, and surfaces process health at
+        automations.  This surfaces process health at
         a glance. Open the live dashboard to review job success rates, volumes,
         and processes that need attention.
       </p>
       <a class="cta" href="dashboard.html">
-        Open Dashboard <span class="arrow">&rarr;</span>
+        Open Job Monitoring <span class="arrow">&rarr;</span>
       </a>
     </section>
 
@@ -183,5 +64,27 @@
 
     <footer>UiPath Orchestrator &mdash; Automated reporting</footer>
   </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js"></script>
+  <script>
+    // Public landing page: when a session exists, reveal the Sign out button
+    // and (for admins) the Admin link. Logged-out visitors keep the basic nav.
+    (async function () {
+      var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      var session = (await sb.auth.getSession()).data.session;
+      if (!session) return;
+      var so = document.getElementById("signout");
+      so.hidden = false;
+      so.addEventListener("click", async function () {
+        await sb.auth.signOut(); location.href = "login.html";
+      });
+      var prof = await sb.from("d_app_users").select("is_admin")
+        .eq("user_id", session.user.id).single();
+      if (!prof.error && prof.data && prof.data.is_admin) {
+        document.getElementById("nav-admin").hidden = false;
+      }
+    })();
+  </script>
 </body>
 </html>

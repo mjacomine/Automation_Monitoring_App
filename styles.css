@@ -1,0 +1,568 @@
+/* ============================================================================
+   RPA Operations — shared design system
+   ----------------------------------------------------------------------------
+   Single source of truth for every surface: index, login, admin, and the
+   Python-generated dashboard + trends pages. Edit a token here and all five
+   pages update. Palette keeps the established brand — forest green (primary),
+   slate blue (secondary), warm gold (accent) — on a light, neutral ground.
+   Typography: Fira Sans for UI, Fira Code for data/numerics (tabular figures).
+   Pages link this file and the Fira fonts in <head>; no CSS is inlined per page.
+   ========================================================================== */
+
+:root {
+  /* --- Brand ------------------------------------------------------------- */
+  --brand: #467958;        /* primary  - forest green */
+  --brand-600: #3c6a4d;    /* hover / darker */
+  --brand-700: #2f5540;    /* darkest */
+  --brand-050: #eef3ef;    /* light green tint */
+  --slate: #82A2B1;        /* secondary - slate blue */
+  --slate-600: #5e8090;    /* darker slate (chart benchmark line) */
+  --slate-700: #41606d;    /* dark slate header fills (AA on white) */
+  --slate-050: #eef3f5;
+  --gold: #D4A842;         /* tertiary - warm gold accent */
+  --gold-600: #a87f23;     /* gold text on light (AA) */
+  --gold-700: #8c6a1c;     /* darker gold (chart comparison line) */
+  --gold-050: #faf2dc;
+
+  /* --- Neutrals (slight green bias — chosen, not default grey) ----------- */
+  --canvas: #eef1ef;       /* app background */
+  --surface: #ffffff;      /* cards */
+  --surface-2: #f6f8f7;    /* zebra stripe / inset */
+  --border: #e3e8e6;
+  --border-strong: #d2dad6;
+  --text: #1f2a30;
+  --text-muted: #5b6970;
+  --text-subtle: #7c8a91;
+  --on-brand: #ffffff;
+
+  /* --- Semantic status (AA on white) ------------------------------------ */
+  --ok: #2e7d50;
+  --ok-strong: #246b45;    /* badge fill for white text */
+  --ok-050: #e7f3ec;
+  --risk: #c0392b;
+  --risk-050: #f9eae8;
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-sans: "Fira Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Fira Code", ui-monospace, "SFMono-Regular", "Cascadia Code",
+               Consolas, monospace;
+
+  /* --- Spacing (4 / 8 rhythm) ------------------------------------------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px;
+
+  /* --- Shape & effects -------------------------------------------------- */
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 3px rgba(16,24,32,.12);
+  --shadow: 0 1px 2px rgba(16,24,32,.05), 0 8px 24px rgba(16,24,32,.08);
+  --shadow-lg: 0 10px 30px rgba(16,24,32,.14);
+  --ring: 0 0 0 3px rgba(70,121,88,.35);
+
+  --content-width: 1100px;
+}
+
+/* --- Reset & base -------------------------------------------------------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--brand-600); }
+
+a:focus-visible, button:focus-visible, select:focus-visible,
+input:focus-visible, summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: 6px;
+}
+
+/* --- Utilities ----------------------------------------------------------- */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ============================================================================
+   App bar + primary navigation
+   ========================================================================== */
+.appbar {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--brand); color: var(--on-brand);
+  box-shadow: var(--shadow-sm);
+}
+.appbar-inner {
+  max-width: var(--content-width); margin: 0 auto; padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 16px; font-weight: 600; letter-spacing: .2px;
+}
+.brand-mark {
+  width: 14px; height: 14px; border-radius: 4px; background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212,168,66,.25); flex: none;
+}
+.appbar-nav { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.appbar-nav a, .appbar-nav button {
+  color: var(--on-brand); text-decoration: none; font: inherit;
+  font-size: 14px; font-weight: 500; opacity: .9;
+  padding: 6px 12px; border-radius: var(--radius-pill);
+  background: none; border: none; cursor: pointer;
+  transition: background .15s ease, opacity .15s ease;
+}
+.appbar-nav a:hover, .appbar-nav button:hover {
+  background: rgba(255,255,255,.15); opacity: 1;
+}
+.appbar-nav a[aria-current="page"] {
+  background: rgba(255,255,255,.22); opacity: 1; font-weight: 600;
+}
+.appbar-nav a:focus-visible, .appbar-nav button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255,255,255,.7);
+}
+
+/* ============================================================================
+   Page layout
+   ========================================================================== */
+.wrap {
+  max-width: var(--content-width); margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+/* Vertical rhythm between top-level sections (replaces per-card margins). */
+.wrap > * + * { margin-top: var(--space-6); }
+
+.page-head h1 {
+  font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: .2px;
+}
+.page-head .sub, .sub {
+  color: var(--text-muted); font-size: 13.5px; margin-top: 6px;
+}
+.sub .mono { color: var(--text); }
+
+footer {
+  color: var(--text-muted); font-size: 12px; text-align: center;
+}
+
+/* ============================================================================
+   Cards (base) + variants
+   Base card is a surface container with default padding. Modifiers handle the
+   flush table card and the index feature grid.
+   ========================================================================== */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 22px 24px;
+}
+.card.is-flush { padding: 0; overflow: hidden; }   /* dashboard table card */
+.card h2 { font-size: 18px; font-weight: 700; }
+.card-head { margin-bottom: 16px; }
+.card-head h2 { font-size: 18px; font-weight: 700; }
+.card-note { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+/* ============================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  padding: 11px 18px; border-radius: var(--radius-pill); border: 1px solid transparent;
+  background: var(--brand); color: var(--on-brand);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 1px 2px rgba(70,121,88,.25);
+  transition: background .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.btn:hover { background: var(--brand-600); box-shadow: 0 4px 12px rgba(70,121,88,.30); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: progress; box-shadow: none; }
+.btn.secondary { background: var(--gold); color: #3a2e07; box-shadow: 0 1px 2px rgba(168,127,35,.25); }
+.btn.secondary:hover { background: var(--gold-600); color: #fff; }
+.btn.ghost {
+  background: var(--surface); color: var(--brand);
+  border-color: var(--border-strong); box-shadow: none;
+}
+.btn.ghost:hover { background: var(--brand-050); }
+.btn.small { padding: 7px 13px; font-size: 13px; }
+
+/* ============================================================================
+   Forms
+   ========================================================================== */
+label.fld, form label {
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--text-muted); font-weight: 700;
+}
+input[type=email], input[type=password], input[type=text],
+input[type=date], select {
+  font-family: var(--font-sans); font-size: 14px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  text-transform: none; letter-spacing: 0;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input:hover, select:hover { border-color: var(--slate); }
+select, input[type=date] { cursor: pointer; min-width: 180px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.check-inline {
+  display: flex; align-items: center; gap: 8px; font-size: 14px;
+  text-transform: none; letter-spacing: 0; color: var(--text);
+  font-weight: 600; margin-top: 8px; cursor: pointer;
+}
+.check-inline input { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+
+/* Feedback messages */
+.msg {
+  margin-top: 14px; font-size: 14px; padding: 10px 12px;
+  border-radius: var(--radius-sm);
+}
+.msg.ok  { background: var(--ok-050); color: var(--ok-strong); border: 1px solid #cce7d7; }
+.msg.err { background: var(--risk-050); color: var(--risk); border: 1px solid #f0cfc9; }
+
+/* ============================================================================
+   Auth (login)
+   ========================================================================== */
+.auth-wrap {
+  min-height: calc(100vh - 52px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px 20px;
+}
+.auth-card {
+  width: 100%; max-width: 400px; background: var(--surface);
+  border: 1px solid var(--border); border-top: 4px solid var(--gold);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px 28px;
+}
+.auth-card h1 { font-size: 22px; font-weight: 700; }
+.muted { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+form { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
+details.setup { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+details.setup summary {
+  cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-muted);
+}
+details.setup form { gap: 12px; }
+
+/* ============================================================================
+   Home / index — hero, CTA, feature cards
+   ========================================================================== */
+.hero {
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
+  border-radius: var(--radius); padding: 48px 40px; box-shadow: var(--shadow);
+}
+.hero .eyebrow {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--gold-600); font-weight: 700;
+}
+.hero h1 {
+  font-size: 34px; font-weight: 800; color: var(--text);
+  margin-top: 10px; line-height: 1.15; letter-spacing: -.3px; text-wrap: balance;
+}
+.hero p {
+  font-size: 16px; color: var(--text-muted); margin-top: 14px;
+  max-width: 640px; line-height: 1.6;
+}
+.cta {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 28px; padding: 14px 26px;
+  background: var(--brand); color: var(--on-brand); text-decoration: none;
+  font-size: 15px; font-weight: 700; letter-spacing: .3px;
+  border-radius: var(--radius-pill); box-shadow: 0 4px 12px rgba(70,121,88,.30);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.cta:hover {
+  background: var(--brand-600); transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(70,121,88,.40);
+}
+.cta .arrow { font-size: 18px; line-height: 1; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cards .card { padding: 24px; }
+.card .label {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-muted); font-weight: 700; margin-top: 14px;
+}
+.cards .card h2 { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 8px; }
+.card p { font-size: 14px; color: var(--text-muted); margin-top: 8px; line-height: 1.55; }
+.accent-bar { height: 4px; width: 44px; border-radius: var(--radius-pill); background: var(--slate); }
+.accent-bar.gold { background: var(--gold); }
+
+/* ============================================================================
+   Dashboard — filter bar + collapsible multi-select checkbox trees
+   ========================================================================== */
+.filters {
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow);
+}
+.filters .field { display: flex; flex-direction: column; gap: 6px; }
+.filters label {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-muted); font-weight: 700;
+}
+.result-count {
+  margin-left: auto; align-self: center;
+  color: var(--text-muted); font-size: 13px; font-weight: 600;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  background: var(--slate-050); border: 1px solid var(--border);
+  padding: 6px 12px; border-radius: var(--radius-pill);
+}
+
+.cbf { position: relative; }
+.cbf-button {
+  font-family: var(--font-sans); font-size: 14px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  min-width: 220px; cursor: pointer; text-align: left;
+  display: inline-flex; justify-content: space-between; align-items: center; gap: 8px;
+  transition: border-color .15s ease;
+}
+.cbf-button:hover { border-color: var(--slate); }
+.cbf-caret { color: var(--text-muted); font-size: 12px; }
+.cbf-panel {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+  width: 280px; max-height: 340px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 6px;
+}
+.cbf-panel[hidden] { display: none; }
+.tree-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+  border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--text);
+  white-space: nowrap;
+}
+.tree-row:hover { background: var(--brand-050); }
+.tree-row.selected { background: var(--gold-050); color: var(--gold-600); font-weight: 700; }
+.tree-children { padding-left: 18px; }
+.caret { width: 14px; text-align: center; color: var(--text-muted); font-size: 11px; }
+.caret-spacer { width: 14px; display: inline-block; }
+.tree-check { accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer; flex: none; }
+.check-spacer { width: 15px; display: inline-block; }
+
+/* ============================================================================
+   Dashboard — KPI cards
+   ========================================================================== */
+.kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--slate); border-radius: var(--radius);
+  padding: 18px 20px; box-shadow: var(--shadow);
+}
+.kpi .label {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-muted); font-weight: 700;
+}
+.kpi .value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 30px; font-weight: 600; margin-top: 8px;
+  color: var(--text); letter-spacing: -.5px;
+}
+.kpi-hero {
+  border-top-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-050), var(--surface) 62%);
+}
+.kpi-hero .value { font-size: 38px; }
+.value.ok { color: var(--ok); }
+.value.risk { color: var(--risk); }
+
+/* ============================================================================
+   Tables — success matrix (dashboard) + admin users
+   ========================================================================== */
+.table-scroll { overflow: auto; max-height: 72vh; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--slate-700); color: #fff; text-align: right;
+  padding: 13px 16px; font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .6px; font-weight: 700;
+}
+thead th:first-child { text-align: left; }
+tbody td {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  font-size: 14.5px; text-align: right; vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: var(--surface-2); }
+tbody tr:hover { background: var(--brand-050); }
+td.name { text-align: left; font-weight: 600; color: var(--text); }
+td.num { color: var(--text-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.total { font-weight: 700; color: var(--text); font-family: var(--font-mono); }
+td.pct { font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.pct.ok { color: var(--ok); }
+td.pct.risk { color: var(--risk); }
+.empty-row {
+  padding: 22px 16px !important; text-align: center !important;
+  color: var(--text-muted); font-size: 14px;
+}
+
+/* Admin users table uses left-aligned cells (override matrix right-align) */
+.users-table th, .users-table td { text-align: left; }
+.users-table td { font-size: 14px; }
+
+.dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle;
+}
+.dot.ok { background: var(--ok); }
+.dot.risk { background: var(--risk); }
+.badge {
+  display: inline-block; color: #fff; font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: var(--radius-pill); text-transform: uppercase;
+  letter-spacing: .5px; white-space: nowrap;
+}
+.badge.ok { background: var(--ok-strong); }
+.badge.risk { background: var(--risk); }
+
+/* Chips + admin badges */
+.chip {
+  display: inline-block; background: var(--brand-050); color: var(--brand);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  padding: 2px 9px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0;
+}
+.badge-admin {
+  display: inline-block; background: var(--gold-050); color: #6b5212;
+  border: 1px solid var(--gold); border-radius: var(--radius-pill);
+  padding: 2px 9px; font-size: 11px; font-weight: 700;
+}
+
+/* ============================================================================
+   Dashboard — legend
+   ========================================================================== */
+.legend {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow);
+}
+.legend-title {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  font-weight: 700; color: var(--text-muted); margin-bottom: 12px;
+}
+.legend-items {
+  display: flex; gap: 24px; font-size: 13px; align-items: center;
+  color: var(--text); flex-wrap: wrap;
+}
+.legend .dot { width: 11px; height: 11px; }
+
+/* ============================================================================
+   Admin — org access controls, gate states
+   ========================================================================== */
+.orgbox {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-top: 8px; max-height: 220px; overflow: auto;
+  background: var(--surface-2);
+}
+.orgbox .selectall {
+  font-weight: 700; border-bottom: 1px solid var(--border);
+  padding-bottom: 8px; margin-bottom: 8px;
+}
+.orgrow { display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 14px; }
+.orgrow input, .selectall input {
+  accent-color: var(--brand); width: 16px; height: 16px; cursor: pointer;
+}
+.denied { max-width: 520px; margin: 80px auto; text-align: center; color: var(--text-muted); }
+.loading { color: var(--text-muted); font-size: 14px; padding: 12px 0; }
+
+/* ============================================================================
+   Trends — controls, inline SVG charts, period delta
+   ========================================================================== */
+.controls {
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-muted); font-weight: 700;
+}
+.custom-range {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  color: var(--text-muted); font-size: 13px;
+}
+.custom-range input[type=date] { min-width: 150px; }
+.custom-range[hidden] { display: none; }
+
+.chart-wrap { margin-top: 16px; width: 100%; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .axis-label {
+  fill: var(--text-muted); font-size: 11px;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.chart .line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .line.dashed { stroke-dasharray: 6 5; }
+.chart .marker { stroke: #fff; stroke-width: 1.5; transition: r .12s ease; }
+.chart .marker:hover { r: 6; }
+.chart-empty {
+  padding: 48px 16px; text-align: center; color: var(--text-muted);
+  font-size: 14px; background: var(--surface-2);
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+}
+.chart-note {
+  margin-top: 12px; font-size: 13px; color: var(--text);
+  background: var(--gold-050); border: 1px solid var(--gold);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+}
+
+.legend-row { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; }
+.legend-item { display: inline-flex; align-items: center; font-size: 13px; color: var(--text); }
+.swatch {
+  display: inline-block; width: 22px; border-top-width: 3px;
+  border-top-style: solid; margin-right: 8px; vertical-align: middle;
+}
+.swatch.dashed { border-top-style: dashed; }
+
+.delta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.delta-stat {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+}
+.delta-k {
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-muted); font-weight: 700;
+}
+.delta-v {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 24px; font-weight: 700; margin-top: 6px;
+}
+.delta-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.delta.up { color: var(--ok); }
+.delta.down { color: var(--risk); }
+.delta.flat { color: var(--text-muted); }
+
+/* ============================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 860px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi-hero { grid-column: span 2; }
+}
+@media (max-width: 760px) {
+  .cards { grid-template-columns: 1fr; }
+  .hero { padding: 36px 26px; }
+  .hero h1 { font-size: 28px; }
+}
+@media (max-width: 720px) {
+  .delta-grid { grid-template-columns: 1fr; }
+  select, input[type=date] { min-width: 0; width: 100%; }
+  .field { width: 100%; }
+}
+@media (max-width: 680px) {
+  .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .kpis { grid-template-columns: 1fr; }
+  .kpi-hero { grid-column: span 1; }
+  .filters .field, .cbf-button { width: 100%; min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
+}

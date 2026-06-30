@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in &mdash; RPA Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
+    </div>
+  </header>
+  <main class="auth-wrap">
+    <div class="auth-card">
+      <h1>Sign in</h1>
+      <p class="muted">Access your RPA monitoring dashboards.</p>
+      <form id="signin-form">
+        <label>Email
+          <input type="email" id="email" autocomplete="email" required>
+        </label>
+        <label>Password
+          <input type="password" id="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn" id="signin-btn">Sign in</button>
+      </form>
+      <div id="msg" class="msg" role="alert" aria-live="polite" hidden></div>
+
+      <details class="setup">
+        <summary>First-time admin setup</summary>
+        <p class="muted" style="margin-top:10px;">
+          Create the first administrator account. This works only until an
+          admin exists. (If email confirmation is enabled on the project,
+          confirm via the emailed link, then sign in.)
+        </p>
+        <form id="setup-form">
+          <label>Admin email
+            <input type="email" id="su-email" autocomplete="email" required>
+          </label>
+          <label>Password
+            <input type="password" id="su-password" autocomplete="new-password" required>
+          </label>
+          <button type="submit" class="btn secondary" id="su-btn">Create admin account</button>
+        </form>
+      </details>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js"></script>
+  <script>
+    var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    function setMsg(text, isErr) {
+      var m = document.getElementById("msg");
+      m.hidden = false; m.textContent = text;
+      m.className = "msg " + (isErr ? "err" : "ok");
+    }
+    // If already signed in, go straight to the dashboard.
+    sb.auth.getSession().then(function (r) {
+      if (r.data.session) location.href = "dashboard.html";
+    });
+
+    document.getElementById("signin-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById("signin-btn");
+      btn.disabled = true; setMsg("Signing in…", false);
+      var res = await sb.auth.signInWithPassword({
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value,
+      });
+      btn.disabled = false;
+      if (res.error) { setMsg(res.error.message, true); return; }
+      location.href = "dashboard.html";
+    });
+
+    document.getElementById("setup-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById("su-btn");
+      var email = document.getElementById("su-email").value;
+      var password = document.getElementById("su-password").value;
+      btn.disabled = true; setMsg("Creating admin account…", false);
+      var up = await sb.auth.signUp({ email: email, password: password });
+      if (up.error) { btn.disabled = false; setMsg(up.error.message, true); return; }
+      var sess = (await sb.auth.getSession()).data.session;
+      if (!sess) {
+        var si = await sb.auth.signInWithPassword({ email: email, password: password });
+        if (si.error) {
+          btn.disabled = false;
+          setMsg("Account created, but a session could not start (email " +
+            "confirmation may be required). Confirm your email, then sign in.", true);
+          return;
+        }
+      }
+      var fn = await sb.functions.invoke("admin-users", { body: { action: "bootstrap_admin" } });
+      btn.disabled = false;
+      if (fn.error) { setMsg("Bootstrap failed: " + fn.error.message, true); return; }
+      setMsg("Admin account ready. Redirecting…", false);
+      location.href = "admin.html";
+    });
+  </script>
+</body>
+</html>

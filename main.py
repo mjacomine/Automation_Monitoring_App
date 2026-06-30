@@ -33,7 +33,17 @@ from monitoring import (
     persist_snapshot,
     update_last_poll,
 )
-from monitoring.reporting import render_console, render_dashboard
+from monitoring.reporting import render_console, render_dashboard, render_trends
+
+
+def _write_html(filename: str, html: str) -> str:
+    """Write an HTML report next to this script and return its path."""
+    output_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), filename
+    )
+    with open(output_path, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    return output_path
 
 
 def _write_dashboard(settings: Settings, html: str) -> str:
@@ -148,12 +158,16 @@ def run(settings: Settings) -> int:
     print("Job counts per ReleaseName by State:")
     print(render_console(analysis))
 
-    # 7. Report — HTML dashboard ------------------------------------------
-    html = render_dashboard(
-        analysis, report_desc, records=analysis_source.get("value", [])
+    # 7. Report — HTML dashboard + trends shells --------------------------
+    # These are authenticated shells: they embed no data and fetch only the
+    # signed-in user's permitted rows from Supabase (RLS) at view time. The
+    # console report above still reflects the full dataset for operators.
+    output_path = _write_dashboard(
+        settings, render_dashboard(settings.success_threshold)
     )
-    output_path = _write_dashboard(settings, html)
     print(f"\nDashboard written to: {output_path}")
+    trends_path = _write_html("trends.html", render_trends())
+    print(f"Trends written to: {trends_path}")
     if settings.open_dashboard:
         try:
             webbrowser.open(f"file://{output_path}")

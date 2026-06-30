@@ -8,5 +8,6 @@ from __future__ import annotations
 
 from .console import render_console
 from .dashboard import render_dashboard
+from .trends import render_trends
 
-__all__ = ["render_console", "render_dashboard"]
+__all__ = ["render_console", "render_dashboard", "render_trends"]

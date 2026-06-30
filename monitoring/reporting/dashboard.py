@@ -18,261 +18,14 @@ neutral gray scale, so colours are defined once in ``:root`` and reused.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from html import escape
-
-from ..analytics import JobAnalysis
 
 
 # --- Page styling ----------------------------------------------------------
 # Design tokens in :root derive every colour from the three brand hues plus a
 # neutral scale; components reference the tokens so the palette is single-source.
-_CSS = """
-  :root {
-    /* Brand */
-    --brand: #467958;       /* primary  - forest green */
-    --brand-600: #3c6a4d;   /* hover / darker */
-    --brand-700: #2f5540;   /* darkest */
-    --brand-050: #eef3ef;   /* light green tint */
-    --slate: #82A2B1;       /* secondary - slate blue */
-    --slate-600: #5e8090;
-    --slate-700: #41606d;   /* dark slate for header fills (AA) */
-    --slate-050: #eef3f5;
-    --gold: #D4A842;        /* tertiary - warm gold accent */
-    --gold-600: #a87f23;    /* gold text on light (AA) */
-    --gold-050: #faf2dc;
-
-    /* Neutrals */
-    --canvas: #eef1ef;      /* app background */
-    --surface: #ffffff;     /* cards */
-    --surface-2: #f6f8f7;   /* zebra stripe */
-    --border: #e3e8e6;
-    --text: #1f2a30;
-    --text-muted: #5b6970;
-    --on-brand: #ffffff;
-
-    /* Semantic status (AA on white) */
-    --ok: #2e7d50;
-    --ok-strong: #246b45;   /* badge fill for white text */
-    --risk: #c0392b;
-
-    /* Effects */
-    --radius: 14px;
-    --radius-sm: 9px;
-    --shadow: 0 1px 2px rgba(16,24,32,.05), 0 8px 24px rgba(16,24,32,.08);
-    --shadow-sm: 0 1px 3px rgba(16,24,32,.12);
-    --ring: 0 0 0 3px rgba(70,121,88,.35);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--canvas);
-    color: var(--text);
-    line-height: 1.5;
-  }
-
-  a:focus-visible, button:focus-visible, select:focus-visible,
-  input:focus-visible {
-    outline: none; box-shadow: var(--ring);
-  }
-
-  /* Top app bar */
-  .appbar {
-    position: sticky; top: 0; z-index: 50;
-    background: var(--brand); color: var(--on-brand);
-    box-shadow: var(--shadow-sm);
-  }
-  .appbar-inner {
-    max-width: 1100px; margin: 0 auto; padding: 14px 24px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .brand {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 16px; font-weight: 700; letter-spacing: .3px;
-  }
-  .brand-mark {
-    width: 14px; height: 14px; border-radius: 4px; background: var(--gold);
-    box-shadow: 0 0 0 3px rgba(212,168,66,.25);
-  }
-  .appbar-nav a {
-    color: var(--on-brand); text-decoration: none;
-    font-size: 14px; font-weight: 600; opacity: .92;
-    padding: 6px 12px; border-radius: 999px;
-  }
-  .appbar-nav a:hover { background: rgba(255,255,255,.15); opacity: 1; }
-  .appbar-nav a:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
-
-  /* Layout */
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 48px; }
-  .page-head { margin-bottom: 24px; }
-  .page-head h1 {
-    font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: .2px;
-  }
-  .sub { color: var(--text-muted); font-size: 13.5px; margin-top: 6px; }
-
-  /* Filter bar */
-  .filters {
-    display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 18px 20px;
-    box-shadow: var(--shadow); margin-bottom: 24px;
-  }
-  .filters .field { display: flex; flex-direction: column; gap: 6px; }
-  .filters label {
-    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
-    color: var(--text-muted); font-weight: 700;
-  }
-  .result-count {
-    margin-left: auto; align-self: center;
-    color: var(--text-muted); font-size: 13px; font-weight: 600;
-    background: var(--slate-050); border: 1px solid var(--border);
-    padding: 6px 12px; border-radius: 999px;
-  }
-
-  /* Collapsible multi-select checkbox filter (Organization + Error Date) */
-  .cbf { position: relative; }
-  .cbf-button {
-    font-family: inherit; font-size: 14px; padding: 10px 12px;
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    background: var(--surface); color: var(--text);
-    min-width: 220px; cursor: pointer; text-align: left;
-    display: inline-flex; justify-content: space-between; align-items: center;
-    gap: 8px;
-  }
-  .cbf-button:hover { border-color: var(--slate); }
-  .cbf-caret { color: var(--text-muted); font-size: 12px; }
-  .cbf-panel {
-    position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
-    width: 280px; max-height: 340px; overflow-y: auto;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px;
-  }
-  .cbf-panel[hidden] { display: none; }
-  .tree-row {
-    display: flex; align-items: center; gap: 8px; padding: 7px 8px;
-    border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--text);
-    white-space: nowrap;
-  }
-  .tree-row:hover { background: var(--brand-050); }
-  .tree-row.selected {
-    background: var(--gold-050); color: var(--gold-600); font-weight: 700;
-  }
-  .tree-children { padding-left: 18px; }
-  .caret { width: 14px; text-align: center; color: var(--text-muted); font-size: 11px; }
-  .caret-spacer { width: 14px; display: inline-block; }
-  .tree-check {
-    accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer;
-    flex: none;
-  }
-  .check-spacer { width: 15px; display: inline-block; }
-
-  /* KPI cards */
-  .kpis {
-    display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 16px; margin-bottom: 24px;
-  }
-  .kpi {
-    background: var(--surface); border: 1px solid var(--border);
-    border-top: 3px solid var(--slate); border-radius: var(--radius);
-    padding: 18px 20px; box-shadow: var(--shadow);
-  }
-  .kpi .label {
-    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
-    color: var(--text-muted); font-weight: 700;
-  }
-  .kpi .value {
-    font-size: 30px; font-weight: 800; margin-top: 8px;
-    color: var(--text); letter-spacing: -.5px;
-  }
-  .kpi-hero {
-    border-top-color: var(--gold);
-    background: linear-gradient(180deg, var(--gold-050), var(--surface) 62%);
-  }
-  .kpi-hero .value { font-size: 38px; }
-  .value.ok { color: var(--ok); }
-  .value.risk { color: var(--risk); }
-
-  /* Success matrix */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
-  }
-  .table-scroll { overflow: auto; max-height: 72vh; }
-  table { width: 100%; border-collapse: collapse; }
-  thead th {
-    position: sticky; top: 0; z-index: 1;
-    background: var(--slate-700); color: #ffffff; text-align: right;
-    padding: 13px 16px; font-size: 11.5px; text-transform: uppercase;
-    letter-spacing: .6px; font-weight: 700;
-  }
-  thead th:first-child { text-align: left; }
-  tbody td {
-    padding: 13px 16px; border-bottom: 1px solid var(--border);
-    font-size: 14.5px; text-align: right;
-  }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) { background: var(--surface-2); }
-  tbody tr:hover { background: var(--brand-050); }
-  td.name { text-align: left; font-weight: 600; color: var(--text); }
-  td.num { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-  td.total { font-weight: 700; color: var(--text); }
-  td.pct { font-weight: 700; font-variant-numeric: tabular-nums; }
-  td.pct.ok { color: var(--ok); }
-  td.pct.risk { color: var(--risk); }
-  .empty-row {
-    padding: 22px 16px !important; text-align: center !important;
-    color: var(--text-muted); font-size: 14px;
-  }
-  .dot {
-    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-    margin-right: 7px; vertical-align: middle;
-  }
-  .dot.ok { background: var(--ok); }
-  .dot.risk { background: var(--risk); }
-  .badge {
-    display: inline-block; color: #fff; font-size: 11px; font-weight: 700;
-    padding: 4px 10px; border-radius: 999px; text-transform: uppercase;
-    letter-spacing: .5px; white-space: nowrap;
-  }
-  .badge.ok { background: var(--ok-strong); }
-  .badge.risk { background: var(--risk); }
-
-  /* Legend */
-  .legend {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px 20px;
-    box-shadow: var(--shadow); margin-top: 18px;
-  }
-  .legend-title {
-    font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px;
-    font-weight: 700; color: var(--text-muted); margin-bottom: 12px;
-  }
-  .legend-items {
-    display: flex; gap: 24px; font-size: 13px; align-items: center;
-    color: var(--text); flex-wrap: wrap;
-  }
-  .legend .dot { width: 11px; height: 11px; }
-
-  footer {
-    color: var(--text-muted); font-size: 12px; margin-top: 24px;
-    text-align: center;
-  }
-
-  @media (max-width: 860px) {
-    .kpis { grid-template-columns: repeat(2, 1fr); }
-    .kpi-hero { grid-column: span 2; }
-  }
-  @media (max-width: 520px) {
-    .kpis { grid-template-columns: 1fr; }
-    .kpi-hero { grid-column: span 1; }
-    .filters .field, .cbf-button { width: 100%; min-width: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; scroll-behavior: auto !important; }
-  }
-"""
+_CSS = ""  # styling moved to shared styles.css (single source of truth)
 
 
 # --- Client-side aggregation + filtering -----------------------------------
@@ -544,7 +297,14 @@ function setupPanel(buttonId, panelId, onRefresh) {
   });
 }
 
-(function init() {
+// Called by the auth/fetch bootstrap once RECORDS and STATES are populated
+// from the live, RLS-filtered Supabase query.
+function initDashboard() {
+  $("thead-row").innerHTML = '<th scope="col">Process (ReleaseName)</th>' +
+    STATES.map(function (s) { return '<th scope="col">' + esc(s) + "</th>"; }).join("") +
+    '<th scope="col">Total</th><th scope="col">Success %</th>' +
+    '<th scope="col">Status</th>';
+
   var orgs = distinct(RECORDS.map(function (r) { return r.o; })).sort();
   $("org-list").innerHTML = renderOrgList(orgs);
   setupPanel("org-button", "org-panel", refreshOrgFilter);
@@ -554,48 +314,77 @@ function setupPanel(buttonId, panelId, onRefresh) {
   setupPanel("date-button", "date-panel", refreshDateFilter);
 
   render();
+}
+"""
+
+# --- Auth gate + live, RLS-filtered data fetch ----------------------------
+# Requires a logged-in session, then loads only the organizations and job rows
+# the user is permitted to see (RLS enforces this), builds RECORDS/STATES, and
+# renders. No data is embedded server-side, so the page exposes nothing on its
+# own — access is decided by the database per authenticated user.
+_DASHBOARD_BOOTSTRAP = """
+(async function () {
+  var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  var session = (await sb.auth.getSession()).data.session;
+  if (!session) { location.href = "login.html"; return; }
+  var so = document.getElementById("signout");
+  if (so) so.addEventListener("click", async function () {
+    await sb.auth.signOut(); location.href = "login.html";
+  });
+  try {
+    var orgs = {};
+    var orgRes = await sb.from("d_organizations").select("organization_id, organization_name");
+    if (orgRes.error) throw orgRes.error;
+    (orgRes.data || []).forEach(function (o) { orgs[o.organization_id] = o.organization_name; });
+
+    var rows = [], from = 0, PAGE = 1000;
+    while (true) {
+      var res = await sb.from("f_auto_metrics_jobs")
+        .select("organization_id, job_name, job_state, error_datetime")
+        .range(from, from + PAGE - 1);
+      if (res.error) throw res.error;
+      rows = rows.concat(res.data);
+      if (res.data.length < PAGE) break;
+      from += PAGE;
+    }
+    RECORDS = rows.map(function (r) {
+      return {
+        o: orgs[r.organization_id] || r.organization_id,
+        r: r.job_name,
+        s: r.job_state,
+        d: r.error_datetime ? String(r.error_datetime).slice(0, 10) : null
+      };
+    });
+    STATES = Array.from(new Set(RECORDS.map(function (r) { return r.s; })
+      .filter(Boolean))).sort();
+    var stamp = document.getElementById("refresh-stamp");
+    if (stamp) stamp.textContent = new Date().toLocaleString();
+    initDashboard();
+  } catch (e) {
+    var tb = document.getElementById("table-body");
+    if (tb) tb.innerHTML = '<tr><td colspan="20" class="empty-row">Could not load ' +
+      "data: " + (e.message || e) + "</td></tr>";
+  }
 })();
 """
 
 
 def render_dashboard(
-    analysis: JobAnalysis,
-    filter_desc: str,
-    records: list[dict] | None = None,
+    threshold: float = 90.0,
     generated_at: datetime | None = None,
 ) -> str:
-    """Build the interactive executive HTML dashboard for a job analysis.
+    """Build the authenticated, interactive HTML dashboard shell.
+
+    The page embeds NO data: on load it requires a Supabase session and fetches
+    only the organizations/jobs the signed-in user may see (enforced by RLS),
+    then computes the KPIs and success matrix client-side. ``threshold`` is the
+    success-rate cutoff for the On Target / Needs Attention split.
 
     Args:
-        analysis: The aggregated domain model. Supplies the full (unfiltered)
-            ``states`` column set and the success ``threshold``; the live KPI
-            and matrix values are computed client-side from ``records``.
-        filter_desc: Human-readable description of the OData filter applied.
-        records: Per-job rows (``Organization``, ``ReleaseName``, ``State``,
-            ``ErrorDate``) embedded for client-side filtering. Defaults to none.
-        generated_at: Timestamp to stamp on the report (defaults to now).
+        threshold: Percent at/above which a process counts as healthy.
+        generated_at: Timestamp to stamp on the page shell (defaults to now).
     """
     stamp = (generated_at or datetime.now()).strftime("%B %d, %Y at %I:%M %p")
-    threshold = analysis.success_threshold
-    states = analysis.states
-
-    state_headers = "".join(
-        f'<th scope="col">{escape(s)}</th>' for s in states
-    )
-
-    # Compact, minimal per-row payload for the browser: o=org, r=release,
-    # s=state, d=error date. "</" is escaped so a value can't close the script.
-    compact = [
-        {
-            "o": rec.get("Organization"),
-            "r": rec.get("ReleaseName"),
-            "s": rec.get("State"),
-            "d": rec.get("ErrorDate"),
-        }
-        for rec in (records or [])
-    ]
-    records_json = json.dumps(compact).replace("</", "<\\/")
-    states_json = json.dumps(states).replace("</", "<\\/")
 
     head = (
         "<!DOCTYPE html>\n"
@@ -604,15 +393,23 @@ def render_dashboard(
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         "<title>RPA Job Success Dashboard</title>\n"
-        "<style>" + _CSS + "</style>\n"
+        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">\n'
+        '<link rel="stylesheet" href="styles.css">\n'
         "</head>\n"
         "<body>\n"
         '  <header class="appbar">\n'
         '    <div class="appbar-inner">\n'
         '      <div class="brand"><span class="brand-mark"></span>'
         "RPA Operations</div>\n"
-        '      <nav class="appbar-nav"><a href="index.html">'
-        "&larr; Home</a></nav>\n"
+        '      <nav class="appbar-nav">\n'
+        '        <a href="index.html">Home</a>\n'
+        '        <a href="dashboard.html" aria-current="page">Dashboard</a>\n'
+        '        <a href="trends.html">Trending</a>\n'
+        '        <a href="admin.html">Admin</a>\n'
+        '        <button type="button" id="signout">Sign out</button>\n'
+        "      </nav>\n"
         "    </div>\n"
         "  </header>\n"
         '  <main class="wrap">\n'
@@ -621,9 +418,9 @@ def render_dashboard(
     )
 
     header_sub = (
-        f'      <div class="sub">Last Refreshed {escape(stamp)} '
-        f'&nbsp;&bull;&nbsp; <span id="filter-summary">Filters: '
-        f"{escape(filter_desc)}</span></div>\n"
+        f'      <div class="sub">Last Refreshed <span id="refresh-stamp">'
+        f"{escape(stamp)}</span> &nbsp;&bull;&nbsp; "
+        '<span id="filter-summary">Loading your data&hellip;</span></div>\n'
         "    </div>\n"
     )
 
@@ -678,19 +475,11 @@ def render_dashboard(
     )
 
     table_part = (
-        '\n    <section class="card table-card"'
+        '\n    <section class="card is-flush"'
         ' aria-label="Process success matrix">\n'
         '      <div class="table-scroll">\n'
         "        <table>\n"
-        "          <thead>\n"
-        "            <tr>\n"
-        '              <th scope="col">Process (ReleaseName)</th>\n'
-        f"              {state_headers}\n"
-        '              <th scope="col">Total</th>\n'
-        '              <th scope="col">Success %</th>\n'
-        '              <th scope="col">Status</th>\n'
-        "            </tr>\n"
-        "          </thead>\n"
+        '          <thead><tr id="thead-row"></tr></thead>\n'
         '          <tbody id="table-body"></tbody>\n'
         "        </table>\n"
         "      </div>\n"
@@ -712,11 +501,13 @@ def render_dashboard(
     )
 
     data_script = (
+        '  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">'
+        "</script>\n"
+        '  <script src="app-config.js"></script>\n'
         "  <script>\n"
-        "const RECORDS = " + records_json + ";\n"
-        "const STATES = " + states_json + ";\n"
-        "const THRESHOLD = " + str(float(threshold)) + ";\n"
+        "var RECORDS = [], STATES = [], THRESHOLD = " + str(float(threshold)) + ";\n"
         + _DASHBOARD_JS
+        + _DASHBOARD_BOOTSTRAP
         + "  </script>\n"
     )
 
