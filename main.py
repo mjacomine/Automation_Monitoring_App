@@ -86,8 +86,13 @@ def _process_client(settings: Settings, client: ClientConfig) -> dict | None:
 
     metrics = persist_metrics_jobs(settings, client, payload)
     if metrics is not None:
-        upserted, skipped = metrics
-        msg = f"  Upserted {upserted} row(s) into f_auto_metrics_jobs."
+        inserted, duplicates, skipped = metrics
+        msg = f"  Inserted {inserted} row(s) into f_auto_metrics_jobs."
+        if duplicates:
+            msg += (
+                f" Skipped {duplicates} duplicate(s) already stored for this "
+                "job key and organization."
+            )
         if skipped:
             msg += f" Skipped {skipped} with no ReleaseName."
         print(msg)

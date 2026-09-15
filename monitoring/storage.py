@@ -251,10 +251,11 @@ def persist_snapshot(
 
 # --- f_auto_metrics_jobs: select-field mirror for metrics dashboards ---------
 # A compact, hand-maintained Supabase table holding only the few fields the
-# metrics views need. Maps Orchestrator JSON field -> table column. Rows are
-# upserted on the unique ``job_key`` so re-runs refresh existing rows instead
-# of failing the unique constraint. The table itself is created in Supabase
-# (it is not part of :func:`schema_sql`).
+# metrics views need. Maps Orchestrator JSON field -> table column. A row is
+# identified by the ``(job_key, organization_id)`` pair: if that combination is
+# already stored the incoming job is a duplicate and is skipped, leaving the
+# existing row untouched. The table itself is created in Supabase (it is not
+# part of :func:`schema_sql`).
 #
 # ``organization_id`` is NOT taken from the job JSON: it is set to the
 # configured client's ``client_code`` (see :func:`persist_metrics_jobs`), so
@@ -277,20 +278,25 @@ _METRICS_FIELD_TYPES: dict[str, str] = {
 
 def persist_metrics_jobs(
     settings: Settings, client: ClientConfig, payload: dict
-) -> tuple[int, int] | None:
-    """Upsert select job fields into the ``f_auto_metrics_jobs`` table.
+) -> tuple[int, int, int] | None:
+    """Insert select job fields into the ``f_auto_metrics_jobs`` table.
 
     Iterates every job in the Orchestrator payload and writes one compact row
-    (organization id, job key, job name, job state) per job, upserted on the
-    unique ``job_key``. ``organization_id`` is set to ``client.client_code``
-    (not the job's ``OrganizationUnitId``), so every row is attributed to the
-    Orchestrator client it was fetched from. Jobs with no ``ReleaseName``
-    (e.g. Studio debug runs) are skipped: they can't be attributed to a process
-    and ``job_name`` is ``NOT NULL``. No-ops (returning ``None``) when no
-    ``DATABASE_URL`` is configured, so local development needs no database.
+    (organization id, job key, job name, job state) per job.
+    ``organization_id`` is set to ``client.client_code`` (not the job's
+    ``OrganizationUnitId``), so every row is attributed to the Orchestrator
+    client it was fetched from.
+
+    A job whose ``(job_key, organization_id)`` pair is already stored is a
+    duplicate: it is not imported and the existing row is left exactly as it
+    is. Jobs with no ``ReleaseName`` (e.g. Studio debug runs) are skipped
+    before the insert: they can't be attributed to a process and ``job_name``
+    is ``NOT NULL``. No-ops (returning ``None``) when no ``DATABASE_URL`` is
+    configured, so local development needs no database.
 
     Returns:
-        ``(upserted, skipped)`` — the number of jobs written and the number
+        ``(inserted, duplicates, skipped)`` — the number of new rows written,
+        the number rejected as already-stored duplicates, and the number
         skipped for having no ``ReleaseName`` — or ``None`` if persistence was
         skipped entirely (no database configured).
 
@@ -310,15 +316,19 @@ def persist_metrics_jobs(
     # from a job field; the rest are mapped per-job from the payload.
     cols = ["organization_id"] + [METRICS_FIELD_MAP[f] for f in fields]
     placeholders = ", ".join(["%s"] * len(cols))
-    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "job_key")
+    # DO NOTHING, not DO UPDATE: an already-stored (job_key, organization_id)
+    # pair is a duplicate, so the incoming job is discarded and the stored row
+    # is left untouched. The pair is backed by a unique constraint, which is
+    # what lets Postgres detect the clash rather than inserting a second row.
     sql = (
         f"INSERT INTO f_auto_metrics_jobs ({', '.join(cols)}) "
         f"VALUES ({placeholders}) "
-        f"ON CONFLICT (job_key) DO UPDATE SET {updates}"
+        f"ON CONFLICT (job_key, organization_id) DO NOTHING"
     )
 
     jobs = payload.get("value", [])
-    count = 0
+    inserted = 0
+    duplicates = 0
     skipped = 0
     with psycopg.connect(settings.database_url) as conn:
         with conn.cursor() as cur:
@@ -331,9 +341,14 @@ def persist_metrics_jobs(
                     _coerce(job.get(f), _METRICS_FIELD_TYPES[f]) for f in fields
                 ]
                 cur.execute(sql, row)
-                count += 1
+                # DO NOTHING reports zero affected rows when the pair already
+                # existed, which is how a duplicate is told from a new row.
+                if cur.rowcount:
+                    inserted += 1
+                else:
+                    duplicates += 1
         conn.commit()
-    return count, skipped
+    return inserted, duplicates, skipped
 
 
 def load_metrics_jobs(settings: Settings) -> dict | None:
