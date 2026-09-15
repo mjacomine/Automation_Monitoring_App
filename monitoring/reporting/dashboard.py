@@ -1,99 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RPA Job Success Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body class="page-wide">
-  <header class="appbar">
-    <div class="appbar-inner">
-      <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
-      <nav class="appbar-nav">
-        <a href="index.html">Home</a>
-        <a href="dashboard.html" aria-current="page">Dashboard</a>
-        <a href="trends.html">Trending</a>
-        <a href="admin.html">Admin</a>
-        <button type="button" id="signout">Sign out</button>
-      </nav>
-    </div>
-  </header>
-  <main class="wrap">
-    <div class="page-head">
-      <h1>Job Success Dashboard</h1>
-      <div class="sub">Last Refreshed <span id="refresh-stamp">September 15, 2026 at 11:03 AM</span> &nbsp;&bull;&nbsp; <span id="filter-summary">Loading your data&hellip;</span></div>
-    </div>
+"""HTML dashboard reporting backend.
 
-    <section class="filters" aria-label="Filters">
-      <div class="field">
-        <label id="org-label">Organization</label>
-        <div class="cbf">
-          <button type="button" class="cbf-button" id="org-button" aria-haspopup="true" aria-expanded="false" aria-label="Filter by organization">All Organizations <span class="cbf-caret">&#9662;</span></button>
-          <div class="cbf-panel" id="org-panel" hidden role="group" aria-label="Organization filter">
-            <div class="tree-row tree-all selected"><span class="check-spacer"></span><span class="tree-label">All Organizations</span></div>
-            <div id="org-list"></div>
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label id="process-label">Process Name</label>
-        <div class="cbf">
-          <button type="button" class="cbf-button" id="process-button" aria-haspopup="true" aria-expanded="false" aria-label="Filter by process name">All Processes <span class="cbf-caret">&#9662;</span></button>
-          <div class="cbf-panel" id="process-panel" hidden role="group" aria-label="Process name filter">
-            <div class="tree-row tree-all selected"><span class="check-spacer"></span><span class="tree-label">All Processes</span></div>
-            <div id="process-list"></div>
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label id="date-label">Process Run Date</label>
-        <div class="cbf">
-          <button type="button" class="cbf-button" id="date-button" aria-haspopup="true" aria-expanded="false" aria-label="Filter by process run date">All Dates <span class="cbf-caret">&#9662;</span></button>
-          <div class="cbf-panel" id="date-panel" hidden role="group" aria-label="Process run date filter">
-            <div class="tree-row tree-all selected"><span class="caret-spacer"></span><span class="check-spacer"></span><span class="tree-label">All Dates</span></div>
-            <div id="date-tree"></div>
-          </div>
-        </div>
-      </div>
-      <div class="result-count" id="result-count"></div>
-    </section>
+Renders a :class:`~monitoring.analytics.JobAnalysis` into a self-contained,
+executive-style HTML page with KPI cards and a colour-coded success matrix.
+Presentation concerns (colours, layout, copy) live here and nowhere else.
 
-    <section class="kpis" aria-label="Key metrics">
-      <div class="kpi"><div class="label">Unique Automations</div><div class="value" id="kpi-automations">0</div></div>
-      <div class="kpi"><div class="label">Total Jobs</div><div class="value" id="kpi-total">0</div></div>
-      <div class="kpi kpi-hero"><div class="label">Overall Success</div><div class="value" id="kpi-success">0%</div></div>
-      <div class="kpi"><div class="label">Processes On Target</div><div class="value ok" id="kpi-ontarget">0</div></div>
-      <div class="kpi"><div class="label">Processes At Risk</div><div class="value risk" id="kpi-atrisk">0</div></div>
-    </section>
+The page is interactive: the per-job rows are embedded as JSON and the KPIs and
+success matrix are (re)computed client-side, so the Organization, Process Name
+and Process Run Date filters re-aggregate the view without a server round-trip.
+The JavaScript aggregation mirrors :func:`~monitoring.analytics.analyze_jobs`.
 
-    <section class="card is-flush" aria-label="Process success matrix">
-      <div class="table-scroll">
-        <table>
-          <thead><tr id="thead-row"></tr></thead>
-          <tbody id="table-body"></tbody>
-        </table>
-      </div>
-    </section>
+The filters share one collapsible, multi-select checkbox control: Organization
+and Process Name are flat checkbox lists, Process Run Date a Year > Month > Day
+tree. The Process Name options are scoped to the current Organization selection
+(all automations when no org is chosen) and sorted alphabetically.
 
-    <section class="legend" aria-label="Legend">
-      <div class="legend-title">Legend</div>
-      <div class="legend-items">
-        <span><span class="dot ok"></span>Success % &ge; 90% (On Target)</span>
-        <span><span class="dot risk"></span>Success % &lt; 90% (Needs Attention)</span>
-      </div>
-    </section>
+The success matrix lays its job-state columns out in lifecycle order (Running,
+Stopped, Faulted, Successful) rather than alphabetically; see ``STATE_ORDER``.
+It is sortable on every column — process name, each job state,
+Total, Success % and Status. Clicking a header sorts by it (text ascending,
+numbers descending on first click) and clicking again reverses; the active
+column is marked with an arrow and ``aria-sort`` for screen readers.
 
-    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>
-  </main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app-config.js"></script>
-  <script>
-var RECORDS = [], STATES = [], THRESHOLD = 90.0;
+Success % is measured over completed jobs only (see
+:data:`~monitoring.analytics.SUCCESS_RATE_STATES`): jobs still Running are
+shown in their own column and counted in Total, but excluded from the success
+denominator. Visual design
+uses CSS custom properties (design tokens) built from the brand palette —
+forest green (primary), slate blue (secondary), warm gold (accent) — plus a
+neutral gray scale, so colours are defined once in ``:root`` and reused.
+"""
 
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from html import escape
+
+from ..analytics import SUCCESS_RATE_STATES
+from .states import STATE_ORDER
+
+
+# --- Page styling ----------------------------------------------------------
+# Design tokens in :root derive every colour from the three brand hues plus a
+# neutral scale; components reference the tokens so the palette is single-source.
+_CSS = ""  # styling moved to shared styles.css (single source of truth)
+
+
+# --- Client-side aggregation + filtering -----------------------------------
+# Mirrors analytics.analyze_jobs: group by ReleaseName, count by State, derive
+# success % and health against THRESHOLD. Reads the RECORDS / STATES / THRESHOLD
+# constants emitted just above it in the page.
+#
+# Both filters are multi-select checkbox controls sharing one setup routine:
+#   * Organization - a flat checkbox list; a row matches if its org is in the
+#     selected set (empty set = all).
+#   * Error Date - a Year > Month > Day tree; each checked box contributes a
+#     date prefix ("YYYY", "YYYY-MM", or "YYYY-MM-DD") and a row matches if its
+#     date starts with ANY selected prefix (the union; empty = all).
+#
+# Status colour is applied via CSS classes (ok / risk) so the palette stays in
+# the design tokens; the healthy/at-risk decision itself is unchanged.
+_DASHBOARD_JS = """
 const $ = function (id) { return document.getElementById(id); };
 const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -110,7 +77,7 @@ var selectedDates = [];      // checked prefixes: "YYYY" | "YYYY-MM" | "YYYY-MM-
 // the query returned), so any state NOT listed here is kept and appended
 // alphabetically rather than being dropped — a new Orchestrator state still
 // gets a column.
-var STATE_ORDER = ["Running", "Stopped", "Faulted", "Successful"];
+var STATE_ORDER = __STATE_ORDER_JSON__;
 
 // Success % counts only jobs whose outcome is settled. Generated from
 // monitoring.analytics.SUCCESS_RATE_STATES so the dashboard, the console table
@@ -118,7 +85,7 @@ var STATE_ORDER = ["Running", "Stopped", "Faulted", "Successful"];
 // state (notably Running) still appear in their own column and in Total — they
 // are left out of the success denominator only, so an in-flight run is not
 // counted as a failure while it executes.
-var SUCCESS_STATES = ["Faulted", "Stopped", "Successful"];
+var SUCCESS_STATES = __SUCCESS_STATES_JSON__;
 
 function orderStates(states) {
   var known = STATE_ORDER.filter(function (s) { return states.indexOf(s) !== -1; });
@@ -409,8 +376,8 @@ function updateSummary() {
   }
   $("filter-summary").textContent =
     "Filters: Organization = " + orgText +
-    "  \u00b7  Process = " + processText +
-    "  \u00b7  Process Run Date = " + dateText;
+    "  \\u00b7  Process = " + processText +
+    "  \\u00b7  Process Run Date = " + dateText;
 }
 
 function render() {
@@ -552,7 +519,14 @@ function initDashboard() {
 
   render();
 }
+"""
 
+# --- Auth gate + live, RLS-filtered data fetch ----------------------------
+# Requires a logged-in session, then loads only the organizations and job rows
+# the user is permitted to see (RLS enforces this), builds RECORDS/STATES, and
+# renders. No data is embedded server-side, so the page exposes nothing on its
+# own — access is decided by the database per authenticated user.
+_DASHBOARD_BOOTSTRAP = """
 (async function () {
   var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
   var session = (await sb.auth.getSession()).data.session;
@@ -596,6 +570,179 @@ function initDashboard() {
       "data: " + (e.message || e) + "</td></tr>";
   }
 })();
-  </script>
-</body>
-</html>
+"""
+
+
+def render_dashboard(
+    threshold: float = 90.0,
+    generated_at: datetime | None = None,
+) -> str:
+    """Build the authenticated, interactive HTML dashboard shell.
+
+    The page embeds NO data: on load it requires a Supabase session and fetches
+    only the organizations/jobs the signed-in user may see (enforced by RLS),
+    then computes the KPIs and success matrix client-side. ``threshold`` is the
+    success-rate cutoff for the On Target / Needs Attention split.
+
+    Args:
+        threshold: Percent at/above which a process counts as healthy.
+        generated_at: Timestamp to stamp on the page shell (defaults to now).
+    """
+    stamp = (generated_at or datetime.now()).strftime("%B %d, %Y at %I:%M %p")
+
+    head = (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        "<title>RPA Job Success Dashboard</title>\n"
+        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">\n'
+        '<link rel="stylesheet" href="styles.css">\n'
+        "</head>\n"
+        '<body class="page-wide">\n'
+        '  <header class="appbar">\n'
+        '    <div class="appbar-inner">\n'
+        '      <div class="brand"><span class="brand-mark"></span>'
+        "RPA Operations</div>\n"
+        '      <nav class="appbar-nav">\n'
+        '        <a href="index.html">Home</a>\n'
+        '        <a href="dashboard.html" aria-current="page">Dashboard</a>\n'
+        '        <a href="trends.html">Trending</a>\n'
+        '        <a href="admin.html">Admin</a>\n'
+        '        <button type="button" id="signout">Sign out</button>\n'
+        "      </nav>\n"
+        "    </div>\n"
+        "  </header>\n"
+        '  <main class="wrap">\n'
+        '    <div class="page-head">\n'
+        "      <h1>Job Success Dashboard</h1>\n"
+    )
+
+    header_sub = (
+        f'      <div class="sub">Last Refreshed <span id="refresh-stamp">'
+        f"{escape(stamp)}</span> &nbsp;&bull;&nbsp; "
+        '<span id="filter-summary">Loading your data&hellip;</span></div>\n'
+        "    </div>\n"
+    )
+
+    controls = (
+        '\n    <section class="filters" aria-label="Filters">\n'
+        '      <div class="field">\n'
+        '        <label id="org-label">Organization</label>\n'
+        '        <div class="cbf">\n'
+        '          <button type="button" class="cbf-button" id="org-button"'
+        ' aria-haspopup="true" aria-expanded="false"'
+        ' aria-label="Filter by organization">'
+        'All Organizations <span class="cbf-caret">&#9662;</span></button>\n'
+        '          <div class="cbf-panel" id="org-panel" hidden'
+        ' role="group" aria-label="Organization filter">\n'
+        '            <div class="tree-row tree-all selected">'
+        '<span class="check-spacer"></span>'
+        '<span class="tree-label">All Organizations</span></div>\n'
+        '            <div id="org-list"></div>\n'
+        "          </div>\n"
+        "        </div>\n"
+        "      </div>\n"
+        '      <div class="field">\n'
+        '        <label id="process-label">Process Name</label>\n'
+        '        <div class="cbf">\n'
+        '          <button type="button" class="cbf-button" id="process-button"'
+        ' aria-haspopup="true" aria-expanded="false"'
+        ' aria-label="Filter by process name">'
+        'All Processes <span class="cbf-caret">&#9662;</span></button>\n'
+        '          <div class="cbf-panel" id="process-panel" hidden'
+        ' role="group" aria-label="Process name filter">\n'
+        '            <div class="tree-row tree-all selected">'
+        '<span class="check-spacer"></span>'
+        '<span class="tree-label">All Processes</span></div>\n'
+        '            <div id="process-list"></div>\n'
+        "          </div>\n"
+        "        </div>\n"
+        "      </div>\n"
+        '      <div class="field">\n'
+        '        <label id="date-label">Process Run Date</label>\n'
+        '        <div class="cbf">\n'
+        '          <button type="button" class="cbf-button" id="date-button"'
+        ' aria-haspopup="true" aria-expanded="false"'
+        ' aria-label="Filter by process run date">'
+        'All Dates <span class="cbf-caret">&#9662;</span></button>\n'
+        '          <div class="cbf-panel" id="date-panel" hidden'
+        ' role="group" aria-label="Process run date filter">\n'
+        '            <div class="tree-row tree-all selected">'
+        '<span class="caret-spacer"></span><span class="check-spacer"></span>'
+        '<span class="tree-label">All Dates</span></div>\n'
+        '            <div id="date-tree"></div>\n'
+        "          </div>\n"
+        "        </div>\n"
+        "      </div>\n"
+        '      <div class="result-count" id="result-count"></div>\n'
+        "    </section>\n"
+        '\n    <section class="kpis" aria-label="Key metrics">\n'
+        '      <div class="kpi"><div class="label">Unique Automations</div>'
+        '<div class="value" id="kpi-automations">0</div></div>\n'
+        '      <div class="kpi"><div class="label">Total Jobs</div>'
+        '<div class="value" id="kpi-total">0</div></div>\n'
+        '      <div class="kpi kpi-hero"><div class="label">Overall Success</div>'
+        '<div class="value" id="kpi-success">0%</div></div>\n'
+        '      <div class="kpi"><div class="label">Processes On Target</div>'
+        '<div class="value ok" id="kpi-ontarget">0</div></div>\n'
+        '      <div class="kpi"><div class="label">Processes At Risk</div>'
+        '<div class="value risk" id="kpi-atrisk">0</div></div>\n'
+        "    </section>\n"
+    )
+
+    table_part = (
+        '\n    <section class="card is-flush"'
+        ' aria-label="Process success matrix">\n'
+        '      <div class="table-scroll">\n'
+        "        <table>\n"
+        '          <thead><tr id="thead-row"></tr></thead>\n'
+        '          <tbody id="table-body"></tbody>\n'
+        "        </table>\n"
+        "      </div>\n"
+        "    </section>\n"
+    )
+
+    legend = (
+        '\n    <section class="legend" aria-label="Legend">\n'
+        '      <div class="legend-title">Legend</div>\n'
+        '      <div class="legend-items">\n'
+        '        <span><span class="dot ok"></span>'
+        f"Success % &ge; {threshold:.0f}% (On Target)</span>\n"
+        '        <span><span class="dot risk"></span>'
+        f"Success % &lt; {threshold:.0f}% (Needs Attention)</span>\n"
+        "      </div>\n"
+        "    </section>\n"
+        "\n    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>\n"
+        "  </main>\n"
+    )
+
+    data_script = (
+        '  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">'
+        "</script>\n"
+        '  <script src="app-config.js"></script>\n'
+        "  <script>\n"
+        "var RECORDS = [], STATES = [], THRESHOLD = " + str(float(threshold)) + ";\n"
+        # One source of truth for column order: the JS array is generated
+        # from the same STATE_ORDER the console renderer uses.
+        + _DASHBOARD_JS.replace(
+            "__STATE_ORDER_JSON__", json.dumps(list(STATE_ORDER))
+        ).replace(
+            "__SUCCESS_STATES_JSON__", json.dumps(list(SUCCESS_RATE_STATES))
+        )
+        + _DASHBOARD_BOOTSTRAP
+        + "  </script>\n"
+    )
+
+    return (
+        head
+        + header_sub
+        + controls
+        + table_part
+        + legend
+        + data_script
+        + "</body>\n</html>"
+    )

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
+      <nav class="appbar-nav">
+        <a href="index.html" aria-current="page">Home</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="trends.html">Trending</a>
+        <a href="admin.html" id="nav-admin" hidden>Admin</a>
+        <button type="button" id="signout" hidden>Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">Job Monitoring</div>
+          <h1>Keep every automation on target.</h1>
+          <p>
+            RPA Operations tracks UiPath Orchestrator job outcomes across every
+            monitored client, so process health is clear at a glance. Review job
+            success rates, volumes, and the automations that need attention.
+          </p>
+          <div class="hero-cta">
+            <a class="btn lg" href="dashboard.html">Open Job Monitoring <span aria-hidden="true">&rarr;</span></a>
+            <a class="btn lg outline" href="trends.html">View Trends</a>
+          </div>
+        </div>
+
+        <div class="hero-preview">
+          <div class="beam-card">
+            <div class="preview-links">
+              <a class="preview-link" href="dashboard.html">
+                <span><span class="pl-t">Job Monitoring</span><span class="pl-d">Success matrix &amp; KPIs by process</span></span>
+                <span class="pl-arrow" aria-hidden="true">&rarr;</span>
+              </a>
+              <a class="preview-link" href="trends.html">
+                <span><span class="pl-t">Trending Analysis</span><span class="pl-d">Monthly trends &amp; period-over-period</span></span>
+                <span class="pl-arrow" aria-hidden="true">&rarr;</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <div class="accent-bar"></div>
+        <div class="label">Success Analytics</div>
+        <h2>Process Health</h2>
+        <p>Per-process success rates with On&nbsp;Target / Needs&nbsp;Attention
+           status against your success threshold.</p>
+      </div>
+      <div class="card">
+        <div class="accent-bar"></div>
+        <div class="label">Multi-Client</div>
+        <h2>Every Environment</h2>
+        <p>One view across all configured Orchestrator clients, each job
+           attributed to the client it ran in.</p>
+      </div>
+      <div class="card">
+        <div class="accent-bar gold"></div>
+        <div class="label">Incremental</div>
+        <h2>Always Current</h2>
+        <p>Continuous incremental polling keeps the stored dataset up to date
+           without re-scanning history.</p>
+      </div>
+    </section>
+
+    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>
+
+    <div class="tracing-beam" aria-hidden="true"><span class="fill"></span><span class="dot"></span></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js"></script>
+  <script>
+    // Public landing page: when a session exists, reveal the Sign out button
+    // and (for admins) the Admin link. Logged-out visitors keep the basic nav.
+    (async function () {
+      var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+      var session = (await sb.auth.getSession()).data.session;
+      if (!session) return;
+      var so = document.getElementById("signout");
+      so.hidden = false;
+      so.addEventListener("click", async function () {
+        await sb.auth.signOut(); location.href = "login.html";
+      });
+      var prof = await sb.from("d_app_users").select("is_admin")
+        .eq("user_id", session.user.id).single();
+      if (!prof.error && prof.data && prof.data.is_admin) {
+        document.getElementById("nav-admin").hidden = false;
+      }
+    })();
+  </script>
+  <script>
+    // Hero interactions: shadcn-style Tabs + the scroll-linked tracing beam.
+    (function () {
+      var reduce = window.matchMedia
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      Array.prototype.forEach.call(document.querySelectorAll("[data-tabs]"), function (root) {
+        var tabs = Array.prototype.slice.call(root.querySelectorAll(".tab"));
+        function select(tab) {
+          tabs.forEach(function (t) {
+            var on = t === tab;
+            t.setAttribute("aria-selected", on ? "true" : "false");
+            t.tabIndex = on ? 0 : -1;
+            var panel = document.getElementById(t.getAttribute("aria-controls"));
+            if (panel) panel.hidden = !on;
+          });
+        }
+        tabs.forEach(function (tab, i) {
+          tab.addEventListener("click", function () { select(tab); });
+          tab.addEventListener("keydown", function (e) {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+            e.preventDefault();
+            var dir = e.key === "ArrowRight" ? 1 : -1;
+            var next = tabs[(i + dir + tabs.length) % tabs.length];
+            next.focus(); select(next);
+          });
+        });
+      });
+
+      var beam = document.querySelector(".tracing-beam");
+      if (beam && !reduce) {
+        var fill = beam.querySelector(".fill"), dot = beam.querySelector(".dot");
+        var upd = function () {
+          var h = document.documentElement;
+          var max = h.scrollHeight - h.clientHeight;
+          var p = max > 0 ? Math.min(1, h.scrollTop / max) : 0;
+          var pct = (10 + p * 84) + "%";
+          fill.style.height = pct; dot.style.top = pct;
+        };
+        document.addEventListener("scroll", upd, { passive: true });
+        window.addEventListener("resize", upd);
+        upd();
+      }
+    })();
+  </script>
+</body>
+</html>

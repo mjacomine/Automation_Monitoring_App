@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Administration &mdash; RPA Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
+      <nav class="appbar-nav">
+        <a href="index.html">Home</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="trends.html">Trending</a>
+        <a href="admin.html" id="nav-admin" aria-current="page" hidden>Admin</a>
+        <button type="button" id="signout">Sign out</button>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap" id="main" hidden>
+    <div class="page-head">
+      <h1>User Administration</h1>
+      <div class="sub">Create users and assign which organizations they can see.</div>
+    </div>
+
+    <section class="card">
+      <h2>Create user</h2>
+      <div class="grid2">
+        <label class="fld">Email
+          <input type="email" id="nu-email" autocomplete="off">
+        </label>
+        <label class="fld">Temporary password
+          <input type="password" id="nu-password" autocomplete="new-password">
+        </label>
+      </div>
+      <label class="check-inline"><input type="checkbox" id="nu-admin"> Grant administrator access</label>
+      <div class="fld" style="margin-top:14px;">Organization access</div>
+      <div class="orgbox" id="nu-orgs"></div>
+      <button class="btn" id="nu-create" style="margin-top:16px;">Create user</button>
+      <div id="nu-msg" class="msg" role="alert" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Users</h2>
+      <div id="users-loading" class="loading">Loading users…</div>
+      <div id="users-table"></div>
+      <div id="users-msg" class="msg" role="alert" aria-live="polite" hidden></div>
+    </section>
+  </main>
+
+  <div id="gate" class="denied">Checking access…</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js"></script>
+  <script>
+    var sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    var ORGS = [];   // [{organization_id, organization_name}]
+    var USERS = [];  // [{user_id, email, is_admin, orgs:[id...]}]
+
+    function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function show(el, text, isErr){ el.hidden=false; el.textContent=text; el.className="msg "+(isErr?"err":"ok"); }
+    async function call(action, payload){
+      var res = await sb.functions.invoke("admin-users", { body: Object.assign({action:action}, payload||{}) });
+      if (res.error) {
+        // Surface the function's JSON error message when present.
+        var detail = res.error.message;
+        try { var ctx = await res.error.context.json(); if (ctx && ctx.error) detail = ctx.error; } catch(e){}
+        throw new Error(detail);
+      }
+      return res.data;
+    }
+
+    // Render an org checkbox group with a Select All master into `container`.
+    function renderOrgChecks(container, selected, namePrefix){
+      var sel = {}; (selected||[]).forEach(function(o){ sel[o]=true; });
+      var html = '<label class="orgrow selectall"><input type="checkbox" class="'+namePrefix+'-all"> Select all</label>';
+      ORGS.forEach(function(o){
+        html += '<label class="orgrow"><input type="checkbox" class="'+namePrefix+'-org" value="'+esc(o.organization_id)+'"'+
+          (sel[o.organization_id]?" checked":"")+'> '+esc(o.organization_name)+'</label>';
+      });
+      container.innerHTML = html;
+      var all = container.querySelector("."+namePrefix+"-all");
+      var boxes = container.querySelectorAll("."+namePrefix+"-org");
+      function syncAll(){ var n=0; boxes.forEach(function(b){ if(b.checked) n++; });
+        all.checked = n===boxes.length && n>0; all.indeterminate = n>0 && n<boxes.length; }
+      all.addEventListener("change", function(){ boxes.forEach(function(b){ b.checked=all.checked; }); });
+      boxes.forEach(function(b){ b.addEventListener("change", syncAll); });
+      syncAll();
+    }
+    function checkedOrgs(container, namePrefix){
+      var out=[]; container.querySelectorAll("."+namePrefix+"-org").forEach(function(b){ if(b.checked) out.push(b.value); });
+      return out;
+    }
+
+    function renderUsers(){
+      var loading = document.getElementById("users-loading"); loading.hidden = true;
+      var nameOf = {}; ORGS.forEach(function(o){ nameOf[o.organization_id]=o.organization_name; });
+      var rows = USERS.map(function(u){
+        var chips = u.orgs.length
+          ? u.orgs.map(function(id){ return '<span class="chip">'+esc(nameOf[id]||id)+'</span>'; }).join("")
+          : '<span style="color:var(--text-muted)">No access</span>';
+        return '<tr><td>'+esc(u.email)+(u.is_admin?' <span class="badge-admin">ADMIN</span>':'')+'</td>'+
+          '<td>'+chips+'</td>'+
+          '<td><button class="btn ghost small" data-edit="'+esc(u.user_id)+'">Edit access</button></td></tr>'+
+          '<tr id="edit-'+esc(u.user_id)+'" hidden><td colspan="3"><div class="orgbox" data-box="'+esc(u.user_id)+'"></div>'+
+          '<button class="btn small" data-save="'+esc(u.user_id)+'" style="margin-top:10px;">Save access</button></td></tr>';
+      }).join("");
+      document.getElementById("users-table").innerHTML =
+        '<table class="users-table"><thead><tr><th>User</th><th>Organizations</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+      document.querySelectorAll("[data-edit]").forEach(function(btn){
+        btn.addEventListener("click", function(){
+          var id = btn.getAttribute("data-edit");
+          var row = document.getElementById("edit-"+id);
+          row.hidden = !row.hidden;
+          if (!row.hidden) {
+            var u = USERS.filter(function(x){ return x.user_id===id; })[0];
+            renderOrgChecks(row.querySelector("[data-box]"), u.orgs, "e"+id.slice(0,8));
+          }
+        });
+      });
+      document.querySelectorAll("[data-save]").forEach(function(btn){
+        btn.addEventListener("click", async function(){
+          var id = btn.getAttribute("data-save");
+          var box = document.querySelector('[data-box="'+id+'"]');
+          var orgs = checkedOrgs(box, "e"+id.slice(0,8));
+          btn.disabled = true;
+          try { await call("set_assignments", { user_id:id, organization_ids:orgs });
+            await loadUsers(); show(document.getElementById("users-msg"), "Access updated.", false); }
+          catch(e){ btn.disabled=false; show(document.getElementById("users-msg"), e.message, true); }
+        });
+      });
+    }
+
+    async function loadUsers(){
+      var data = await call("list_users");
+      USERS = data.users || [];
+      renderUsers();
+    }
+
+    document.getElementById("nu-create").addEventListener("click", async function(){
+      var btn=this, msg=document.getElementById("nu-msg");
+      var email=document.getElementById("nu-email").value.trim();
+      var password=document.getElementById("nu-password").value;
+      if(!email||!password){ show(msg,"Email and password are required.",true); return; }
+      btn.disabled=true; show(msg,"Creating user…",false);
+      try {
+        await call("create_user", { email:email, password:password,
+          is_admin: document.getElementById("nu-admin").checked,
+          organization_ids: checkedOrgs(document.getElementById("nu-orgs"), "nu") });
+        document.getElementById("nu-email").value=""; document.getElementById("nu-password").value="";
+        document.getElementById("nu-admin").checked=false;
+        renderOrgChecks(document.getElementById("nu-orgs"), [], "nu");
+        await loadUsers();
+        show(msg,"User created.",false);
+      } catch(e){ show(msg, e.message, true); }
+      btn.disabled=false;
+    });
+
+    document.getElementById("signout").addEventListener("click", async function(){
+      await sb.auth.signOut(); location.href="login.html";
+    });
+
+    (async function init(){
+      var session = (await sb.auth.getSession()).data.session;
+      if(!session){ location.href="login.html"; return; }
+      var prof = await sb.from("d_app_users").select("is_admin").eq("user_id", session.user.id).single();
+      if(prof.error || !prof.data || !prof.data.is_admin){
+        document.getElementById("gate").textContent = "Admin access required. You are signed in but not an administrator.";
+        return;
+      }
+      // Admin confirmed — reveal the Admin nav link and load orgs + users.
+      document.getElementById("nav-admin").hidden = false;
+      var orgRes = await sb.from("d_organizations").select("organization_id, organization_name").order("organization_name");
+      ORGS = orgRes.data || [];
+      renderOrgChecks(document.getElementById("nu-orgs"), [], "nu");
+      document.getElementById("gate").hidden = true;
+      document.getElementById("main").hidden = false;
+      try { await loadUsers(); }
+      catch(e){ document.getElementById("users-loading").hidden=true;
+        show(document.getElementById("users-msg"), "Could not load users: "+e.message, true); }
+    })();
+  </script>
+</body>
+</html>
