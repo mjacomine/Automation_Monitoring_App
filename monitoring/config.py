@@ -45,6 +45,10 @@ class ClientConfig:
         """Build this client's fully-qualified Get Jobs OData URL."""
         return f"{self._odata_base(base_url)}/Jobs"
 
+    def queue_items_url(self, base_url: str) -> str:
+        """Build this client's fully-qualified QueueItems OData URL."""
+        return f"{self._odata_base(base_url)}/QueueItems"
+
 
 @dataclass(frozen=True)
 class Settings:

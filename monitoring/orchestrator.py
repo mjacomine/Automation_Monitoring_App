@@ -51,3 +51,27 @@ class OrchestratorClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def get_queue_items(self, params: dict | None = None) -> dict:
+        """Call the QueueItems endpoint and return the decoded OData payload.
+
+        Args:
+            params: OData query options to send, e.g. ``{"$top": 10}`` or
+                ``{"$filter": "CreationTime gt 2026-07-15T00:00:56.393Z"}``.
+
+        Raises:
+            requests.HTTPError: on a non-2xx response.
+        """
+        headers = {
+            "Authorization": f"Bearer {self._access_token}",
+            "Accept": "application/json",
+        }
+
+        response = requests.get(
+            self._client.queue_items_url(self._settings.base_url),
+            headers=headers,
+            params=params or {},
+            timeout=self._settings.request_timeout,
+        )
+        response.raise_for_status()
+        return response.json()
