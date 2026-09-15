@@ -62,6 +62,8 @@
   --ring: 0 0 0 3px rgba(70,121,88,.35);
 
   --content-width: 1100px;
+  /* Wide variant for data-dense pages (the dashboard success matrix). */
+  --content-width-wide: 1500px;
 }
 
 /* --- Reset & base -------------------------------------------------------- */
@@ -138,9 +140,15 @@ input:focus-visible, summary:focus-visible {
    Page layout
    ========================================================================== */
 .wrap {
+  position: relative;
   max-width: var(--content-width); margin: 0 auto;
   padding: 32px 24px 48px;
 }
+/* Pages whose main content is a wide table opt into more horizontal room by
+   setting class="page-wide" on <body>; the app bar tracks it so the header and
+   the content stay edge-aligned. */
+.page-wide .appbar-inner,
+.page-wide .wrap { max-width: var(--content-width-wide); }
 /* Vertical rhythm between top-level sections (replaces per-card margins). */
 .wrap > * + * { margin-top: var(--space-6); }
 
@@ -380,17 +388,26 @@ details.setup form { gap: 12px; }
    ========================================================================== */
 .table-scroll { overflow: auto; max-height: 72vh; }
 table { width: 100%; border-collapse: collapse; }
+/* Size the matrix to its own content rather than to the container: long
+   process names then widen the table (which scrolls) instead of squeezing the
+   count columns off the right edge. min-width keeps it filling a narrow card. */
+.table-scroll > table { width: max-content; min-width: 100%; }
 thead th {
   position: sticky; top: 0; z-index: 1;
   background: var(--slate-700); color: #fff; text-align: right;
   padding: 13px 16px; font-size: 11.5px; text-transform: uppercase;
-  letter-spacing: .6px; font-weight: 700;
+  letter-spacing: .6px; font-weight: 700; white-space: nowrap;
 }
 thead th:first-child { text-align: left; }
 tbody td {
   padding: 13px 16px; border-bottom: 1px solid var(--border);
   font-size: 14.5px; text-align: right; vertical-align: top;
 }
+/* Matrix cells stay on one line so every column keeps its natural width. */
+.table-scroll td.name,
+.table-scroll td.num,
+.table-scroll td.total,
+.table-scroll td.pct { white-space: nowrap; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:nth-child(even) { background: var(--surface-2); }
 tbody tr:hover { background: var(--brand-050); }
@@ -538,6 +555,91 @@ td.pct.risk { color: var(--risk); }
 .delta.flat { color: var(--text-muted); }
 
 /* ============================================================================
+   Navigation menu (ported from the shadcn/Radix NavigationMenu)
+   ----------------------------------------------------------------------------
+   Vanilla equivalent driven by nav-menu.js. Tailwind/shadcn tokens are mapped
+   to the design-system variables: bg-popover -> surface, hover:bg-accent ->
+   brand-050, border -> border, rounded-md -> radius-sm. Panels are positioned
+   relative to the .navmenu root and toggled via [data-open] / [hidden].
+   ========================================================================== */
+.navmenu { position: relative; display: flex; max-width: max-content; }
+.navmenu-list {
+  display: flex; align-items: center; gap: 4px;
+  list-style: none; margin: 0; padding: 0;
+}
+.navmenu-item { position: static; }
+
+/* Trigger + plain link share one style (shadcn navigationMenuTriggerStyle) */
+.navmenu-trigger, .navmenu-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 36px; padding: 8px 16px; border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: 14px; font-weight: 500; line-height: 1;
+  border: 1px solid transparent; cursor: pointer; text-decoration: none;
+  white-space: nowrap; transition: background .15s ease, color .15s ease;
+}
+.navmenu-trigger:hover, .navmenu-link:hover,
+.navmenu-trigger[aria-expanded="true"] { background: var(--brand-050); color: var(--brand); }
+.navmenu-trigger:focus-visible, .navmenu-link:focus-visible { outline: none; box-shadow: var(--ring); }
+.navmenu-caret { width: 12px; height: 12px; transition: transform .3s ease; }
+.navmenu-trigger[aria-expanded="true"] .navmenu-caret { transform: rotate(180deg); }
+
+/* Dropdown content panel */
+.navmenu-content {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); padding: 16px;
+  opacity: 0; transform: translateY(-6px); pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.navmenu-content[data-open="true"] { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.navmenu-content[hidden] { display: none; }
+
+/* Content layouts */
+.navmenu-grid { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; width: min(92vw, 480px); }
+.navmenu-grid.two { grid-template-columns: 1fr 1fr; width: min(94vw, 560px); }
+.navmenu-grid.featured { grid-template-columns: .9fr 1fr; width: min(94vw, 540px); }
+.navmenu-grid .feature { grid-row: span 3; }
+
+.navmenu-feature {
+  display: flex; flex-direction: column; justify-content: flex-end; height: 100%;
+  border-radius: var(--radius-sm); padding: 20px; text-decoration: none;
+  color: var(--text); border: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--brand-050), #d7e6dc 70%, var(--slate-050));
+  transition: box-shadow .15s ease;
+}
+.navmenu-feature:hover { box-shadow: var(--shadow); }
+.navmenu-feature:focus-visible { outline: none; box-shadow: var(--ring); }
+.navmenu-feature .mark {
+  width: 16px; height: 16px; border-radius: 5px; background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212,168,66,.25);
+}
+.navmenu-feature .t { font-size: 16px; font-weight: 700; margin-top: 14px; }
+.navmenu-feature .d { font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+
+.navmenu-li { list-style: none; }
+.navmenu-li a {
+  display: block; border-radius: var(--radius-sm); padding: 12px; text-decoration: none;
+  color: var(--text); transition: background .15s ease, color .15s ease;
+}
+.navmenu-li a:hover { background: var(--brand-050); color: var(--brand); }
+.navmenu-li a:focus-visible { outline: none; box-shadow: var(--ring); }
+.navmenu-li .t { font-size: 14px; font-weight: 600; }
+.navmenu-li .d {
+  font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .navmenu-content { left: 0; right: 0; }
+  .navmenu-grid, .navmenu-grid.two, .navmenu-grid.featured {
+    grid-template-columns: 1fr; width: auto;
+  }
+  .navmenu-grid .feature { grid-row: auto; }
+}
+
+/* ============================================================================
    Responsive
    ========================================================================== */
 @media (max-width: 860px) {
@@ -565,4 +667,94 @@ td.pct.risk { color: var(--risk); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ============================================================================
+   Home hero — ported from "hero-195" (in spirit): border-beam, tabs,
+   tracing beam. The shadcn primitives (Button/Tabs/Card) and the two effect
+   libraries (dillionverma/border-beam, aceternity/tracing-beam) are mapped to
+   the design-system tokens rather than pulled in as React/Tailwind packages.
+   ========================================================================== */
+@property --beam-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.hero { position: relative; }
+.hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+
+/* Button variants (shadcn Button: lg size, outline variant) */
+.btn.lg { padding: 14px 24px; font-size: 15px; }
+.btn.outline {
+  background: var(--surface); color: var(--brand);
+  border-color: var(--border-strong); box-shadow: none;
+}
+.btn.outline:hover { background: var(--brand-050); box-shadow: none; }
+
+/* Tabs (shadcn Tabs, ported) */
+.tabs-list {
+  display: inline-flex; gap: 4px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px; margin-bottom: 14px;
+}
+.tab {
+  border: none; background: none; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--text-muted); padding: 6px 14px; border-radius: 7px; cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.tab[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.tab:focus-visible { outline: none; box-shadow: var(--ring); }
+.tab-panel[hidden] { display: none; }
+
+/* Border-beam preview card (dillionverma/border-beam -> rotating conic ring) */
+.beam-card {
+  position: relative; border-radius: var(--radius); background: var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden;
+}
+.beam-card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(from var(--beam-angle),
+    transparent 0 60%, var(--gold) 76%, var(--brand) 90%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: beam-spin 6s linear infinite;
+}
+@keyframes beam-spin { to { --beam-angle: 360deg; } }
+
+.preview-media img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.preview-cap { font-size: 12.5px; color: var(--text-muted); padding: 12px 16px; border-top: 1px solid var(--border); }
+.preview-links { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.preview-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  text-decoration: none; color: var(--text); background: var(--surface);
+  transition: background .15s ease, border-color .15s ease;
+}
+.preview-link:hover { background: var(--brand-050); border-color: var(--slate); }
+.preview-link .pl-t { display: block; font-size: 14px; font-weight: 700; }
+.preview-link .pl-d { display: block; font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.preview-link .pl-arrow { color: var(--brand); font-size: 18px; }
+
+/* Tracing beam (aceternity/tracing-beam -> scroll-linked left rail) */
+.tracing-beam {
+  position: absolute; left: 10px; top: 24px; bottom: 24px; width: 2px;
+  background: var(--border); border-radius: 2px; pointer-events: none; z-index: 0;
+}
+.tracing-beam .fill {
+  position: absolute; left: 0; top: 0; width: 100%; height: 12%;
+  background: linear-gradient(var(--brand), var(--gold)); border-radius: 2px;
+  box-shadow: 0 0 8px rgba(212,168,66,.5);
+}
+.tracing-beam .dot {
+  position: absolute; left: 1px; top: 12%; width: 10px; height: 10px;
+  transform: translate(-50%, -50%); border-radius: 50%; background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(212,168,66,.2);
+}
+
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 28px; }
+  .tracing-beam { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .beam-card::before { animation: none; }
 }

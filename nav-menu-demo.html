@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navigation Menu &mdash; Component Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand"><span class="brand-mark"></span>RPA Operations</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page-head">
+      <h1>Navigation Menu</h1>
+      <div class="sub">Ported from the shadcn/Radix <span class="mono">NavigationMenu</span> to the
+        vanilla design system &mdash; hover, click, or use the keyboard (Tab, Enter, Esc).</div>
+    </div>
+
+    <section class="card">
+      <nav class="navmenu" data-navmenu aria-label="Primary">
+        <ul class="navmenu-list">
+          <!-- Item 1: featured mega-menu -->
+          <li class="navmenu-item">
+            <button type="button" class="navmenu-trigger" aria-controls="nm-start">
+              Getting started
+              <svg class="navmenu-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="navmenu-content" id="nm-start" hidden>
+              <ul class="navmenu-grid featured">
+                <li class="feature">
+                  <a class="navmenu-feature" href="index.html">
+                    <span class="mark"></span>
+                    <div class="t">RPA Operations</div>
+                    <div class="d">Keep every automation on target &mdash; job success
+                      analytics across every monitored Orchestrator client.</div>
+                  </a>
+                </li>
+                <li class="navmenu-li"><a href="index.html">
+                  <div class="t">Overview</div>
+                  <div class="d">What the portal tracks and how process health is surfaced.</div></a></li>
+                <li class="navmenu-li"><a href="login.html">
+                  <div class="t">Sign in</div>
+                  <div class="d">Access your dashboards; first-run admin setup lives here.</div></a></li>
+                <li class="navmenu-li"><a href="index.html">
+                  <div class="t">How monitoring works</div>
+                  <div class="d">Incremental polling keeps the stored dataset current.</div></a></li>
+              </ul>
+            </div>
+          </li>
+
+          <!-- Item 2: reports grid -->
+          <li class="navmenu-item">
+            <button type="button" class="navmenu-trigger" aria-controls="nm-reports">
+              Reports
+              <svg class="navmenu-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="navmenu-content" id="nm-reports" hidden>
+              <ul class="navmenu-grid two">
+                <li class="navmenu-li"><a href="dashboard.html">
+                  <div class="t">Job Monitoring</div>
+                  <div class="d">Per-process success rates and the colour-coded success matrix.</div></a></li>
+                <li class="navmenu-li"><a href="trends.html">
+                  <div class="t">Trending Analysis</div>
+                  <div class="d">Monthly success-rate trends and period-over-period comparison.</div></a></li>
+                <li class="navmenu-li"><a href="dashboard.html">
+                  <div class="t">Process Health</div>
+                  <div class="d">On&nbsp;Target vs Needs&nbsp;Attention against your success threshold.</div></a></li>
+                <li class="navmenu-li"><a href="dashboard.html">
+                  <div class="t">At-Risk Processes</div>
+                  <div class="d">Automations falling below the configured success threshold.</div></a></li>
+                <li class="navmenu-li"><a href="dashboard.html">
+                  <div class="t">Multi-Client View</div>
+                  <div class="d">Every configured Orchestrator client in a single view.</div></a></li>
+                <li class="navmenu-li"><a href="dashboard.html">
+                  <div class="t">Filters</div>
+                  <div class="d">Slice by organization and error date without a round-trip.</div></a></li>
+              </ul>
+            </div>
+          </li>
+
+          <!-- Item 3: plain link -->
+          <li class="navmenu-item">
+            <a class="navmenu-link" href="admin.html">Administration</a>
+          </li>
+        </ul>
+      </nav>
+
+      <p class="sub" style="margin-top:18px;">This menu is a drop-in replacement candidate for the
+        top-bar navigation. Say the word and I&rsquo;ll wire it into the appbar across all pages.</p>
+    </section>
+  </main>
+
+  <script src="nav-menu.js"></script>
+</body>
+</html>
