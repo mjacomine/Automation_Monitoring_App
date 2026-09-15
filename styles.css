@@ -399,6 +399,24 @@ thead th {
   letter-spacing: .6px; font-weight: 700; white-space: nowrap;
 }
 thead th:first-child { text-align: left; }
+/* Sortable headers: the button fills the cell so the whole header is a click
+   target, and inherits the th's type styling so it reads as a header, not a
+   control. Sort direction is conveyed by the arrow AND by aria-sort on the th.
+   Scoped to the dashboard matrix (.table-scroll) so admin's plain table keeps
+   its own header padding: here the button supplies the padding, not the th. */
+.table-scroll thead th { padding: 0; }
+.th-sort {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  width: 100%; padding: 13px 16px; border: 0; background: none; cursor: pointer;
+  color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit;
+}
+thead th:first-child .th-sort { justify-content: flex-start; }
+.th-sort:hover { background: rgba(255, 255, 255, .10); }
+.th-sort:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.sort-arrow { font-size: 9px; line-height: 1; }
+/* Inactive columns keep a faint hint so it is discoverable that they sort. */
+.sort-arrow.dim { opacity: .35; }
+.th-sort.active { background: rgba(255, 255, 255, .07); }
 tbody td {
   padding: 13px 16px; border-bottom: 1px solid var(--border);
   font-size: 14.5px; text-align: right; vertical-align: top;

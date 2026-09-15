@@ -21,7 +21,10 @@ gold as the comparison-period accent.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
+
+from ..analytics import SUCCESS_RATE_STATES
 from html import escape
 
 # --- Page styling ----------------------------------------------------------
@@ -53,11 +56,18 @@ function monthLabel(k) {
 var ALL_MONTHS = [];
 var ORGS = [];
 
-// monthKey -> {s: successCount, t: total}
+// Success rate counts only jobs whose outcome is settled. Generated from
+// monitoring.analytics.SUCCESS_RATE_STATES so this page, the dashboard and the
+// console table all measure the rate identically; a job still Running is
+// skipped rather than counted as a failure.
+var SUCCESS_STATES = __SUCCESS_STATES_JSON__;
+
+// monthKey -> {s: successCount, t: completed jobs (the rate denominator)}
 function monthlyAgg(records) {
   var m = {};
   records.forEach(function (r) {
     var k = monthKey(r.d); if (!k) return;
+    if (SUCCESS_STATES.indexOf(r.s) === -1) return;  // still in flight
     if (!m[k]) m[k] = { s: 0, t: 0 };
     m[k].t++; if (r.s === "Successful") m[k].s++;
   });
@@ -476,7 +486,9 @@ def render_trends(generated_at: datetime | None = None) -> str:
         '  <script src="app-config.js"></script>\n'
         "  <script>\n"
         "var RECORDS = [];\n"
-        + _TRENDS_JS
+        + _TRENDS_JS.replace(
+            "__SUCCESS_STATES_JSON__", json.dumps(list(SUCCESS_RATE_STATES))
+        )
         + _TRENDS_BOOTSTRAP
         + "  </script>\n"
     )

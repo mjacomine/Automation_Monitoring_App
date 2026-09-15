@@ -6,6 +6,10 @@ domain model (``JobAnalysis``) that every reporting backend renders. Because
 the model is the contract between "compute" and "present", new outputs (CSV,
 Slack, e-mail) can be added without touching this file, and this file can be
 unit-tested with plain dictionaries.
+
+Success rate is measured over *completed* jobs only — see
+:data:`SUCCESS_RATE_STATES`. ``total`` still counts every job, so the Total
+column and the per-state columns are unaffected.
 """
 
 from __future__ import annotations
@@ -14,6 +18,14 @@ from collections import Counter
 from dataclasses import dataclass
 
 UNKNOWN = "(unknown)"
+
+# States whose outcome is settled, and therefore the only ones that count
+# toward a success rate. A job in any other state (notably "Running") has not
+# finished yet: including it would count an in-flight run as a failure and
+# understate success for as long as it executes. Such jobs are still counted in
+# ``total`` and shown in their own column — they are excluded from the success
+# *denominator* only.
+SUCCESS_RATE_STATES: tuple[str, ...] = ("Faulted", "Stopped", "Successful")
 
 
 @dataclass(frozen=True)
@@ -33,8 +45,18 @@ class ReleaseStats:
         return self.state_counts.get("Successful", 0)
 
     @property
+    def completed(self) -> int:
+        """Jobs whose outcome is settled — the success-rate denominator."""
+        return sum(self.state_counts.get(s, 0) for s in SUCCESS_RATE_STATES)
+
+    @property
     def success_pct(self) -> float:
-        return (self.successful / self.total * 100) if self.total else 0.0
+        """Percent successful out of *completed* jobs (see SUCCESS_RATE_STATES).
+
+        Returns 0.0 when nothing has completed yet (e.g. every run is still
+        Running), matching the behaviour for a process with no successes.
+        """
+        return (self.successful / self.completed * 100) if self.completed else 0.0
 
     @property
     def is_healthy(self) -> bool:
@@ -63,10 +85,15 @@ class JobAnalysis:
         return sum(r.successful for r in self.releases)
 
     @property
+    def grand_completed(self) -> int:
+        """Completed jobs across every release — the overall denominator."""
+        return sum(r.completed for r in self.releases)
+
+    @property
     def overall_success_pct(self) -> float:
         return (
-            self.grand_successful / self.grand_total * 100
-            if self.grand_total
+            self.grand_successful / self.grand_completed * 100
+            if self.grand_completed
             else 0.0
         )
 

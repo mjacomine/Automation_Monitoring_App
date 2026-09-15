@@ -3,16 +3,22 @@
 Renders a :class:`~monitoring.analytics.JobAnalysis` as an aligned text table
 for the terminal. It reads only from the domain model, never from the raw API,
 so it stays decoupled from how the data was fetched.
+
+State columns are laid out in the shared lifecycle order (see
+:mod:`monitoring.reporting.states`) rather than the model's alphabetical order,
+so the terminal table and the HTML dashboard present the same column sequence.
 """
 
 from __future__ import annotations
 
 from ..analytics import JobAnalysis
+from .states import order_states
 
 
 def render_console(analysis: JobAnalysis) -> str:
     """Render the ReleaseName x State matrix as an aligned, printable string."""
-    states = analysis.states
+    # Presentation-only reordering: counts and totals are untouched.
+    states = order_states(analysis.states)
     releases = analysis.releases_by_volume()
 
     name_width = max(
