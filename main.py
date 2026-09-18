@@ -30,6 +30,9 @@ from monitoring import (
     load_last_poll,
     load_metrics_jobs,
     persist_metrics_jobs,
+    existing_queue_keys,
+    persist_queue_definitions,
+    persist_queue_items,
     persist_snapshot,
     update_last_poll,
 )
@@ -96,8 +99,75 @@ def _process_client(settings: Settings, client: ClientConfig) -> dict | None:
         if skipped:
             msg += f" Skipped {skipped} with no ReleaseName."
         print(msg)
+    _process_queue_definitions(settings, client, orch)
+    _process_queue_items(settings, client, orch)
     print()
     return payload
+
+
+def _process_queue_definitions(
+    settings: Settings, client: ClientConfig, orch: OrchestratorClient
+) -> None:
+    """Refresh this client's queue dimension in ``d_queues``.
+
+    A failure here is reported but does not fail the client, for the same
+    reason as the queue-item fetch: the dimension is supplementary to the job
+    report and should not cost us data we already retrieved.
+    """
+    try:
+        payload = orch.get_queue_definitions()
+    except requests.RequestException as exc:
+        print(f"  WARNING: QueueDefinitions fetch failed: {exc}", file=sys.stderr)
+        return
+
+    result = persist_queue_definitions(settings, client, payload)
+    if result is None:
+        return
+    written, skipped = result
+    msg = f"  QueueDefinitions: {written} queue(s) written to d_queues."
+    if skipped:
+        msg += f" Skipped {skipped} with no Id."
+    print(msg)
+
+
+def _process_queue_items(
+    settings: Settings, client: ClientConfig, orch: OrchestratorClient
+) -> None:
+    """Fetch and persist this client's processed queue items.
+
+    Items are read newest-first by ``EndProcessing`` and the walk stops at the
+    first ``UniqueKey`` already stored, because the QueueItems endpoint refuses
+    a datetime ``$filter`` (see
+    :meth:`OrchestratorClient.build_queue_filter`). No time cursor is involved.
+
+    A failure here is reported but does not fail the client: queue metrics are
+    supplementary to the job report, so a queue problem should not cost us the
+    job data we already retrieved.
+    """
+    # Walk newest-first and stop at the first item already in the table, so the
+    # queue fetch needs no time cursor at all — the stored keys are the
+    # boundary. The lookup is injected so OrchestratorClient stays DB-free.
+    def _known(keys: list[str]) -> set[str]:
+        return existing_queue_keys(settings, keys)
+
+    try:
+        queue_payload = orch.get_queue_items_until_known(_known)
+    except requests.RequestException as exc:
+        print(f"  WARNING: QueueItems fetch failed: {exc}", file=sys.stderr)
+        return
+
+    result = persist_queue_items(settings, client, queue_payload)
+    if result is None:
+        return
+    inserted, duplicates, skipped = result
+    found = len(queue_payload.get("value", []))
+    msg = (f"  QueueItems: walked {found} new item(s); "
+           f"inserted {inserted} row(s) into f_queue_item_metrics.")
+    if duplicates:
+        msg += f" Skipped {duplicates} duplicate(s) already stored."
+    if skipped:
+        msg += f" Skipped {skipped} with no UniqueKey."
+    print(msg)
 
 
 def run(settings: Settings) -> int:
