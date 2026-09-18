@@ -10,6 +10,10 @@ Two tables are written each run:
 * ``job_snapshots`` — one row per monitoring cycle: the verbatim JSON envelope
   plus run metadata (when, which ``$filter``, how many jobs). This is the
   source of truth and lets any later schema be rebuilt from raw data.
+* ``d_queues`` — the queue dimension: one row per queue definition per
+  organization, refreshed each run.
+* ``f_queue_item_metrics`` — one compact row per processed queue item, keyed
+  on the item's ``UniqueKey``, storing its status and completion time.
 * ``jobs`` — one typed, queryable row per job, keyed on the job ``Key`` (UUID)
   and upserted so re-runs update existing rows instead of duplicating. Every
   job also keeps its verbatim object in a ``raw`` JSONB column, so fields not
@@ -349,6 +353,197 @@ def persist_metrics_jobs(
                     duplicates += 1
         conn.commit()
     return inserted, duplicates, skipped
+
+
+# --- f_queue_item_metrics: select-field mirror for queue dashboards ---------
+# Maps the QueueItems API field -> table column. The columns are quoted
+# identifiers in Postgres (mixed case), so every reference must stay quoted.
+#
+# ``organization_id`` is NOT taken from the item JSON: like
+# f_auto_metrics_jobs it is set to the configured client's ``client_code``, so
+# every row is attributed to the Orchestrator client it was fetched from.
+#
+# ``EndProcessing`` is stored as the UTC instant the API returned. It is
+# normalized to the organization's timezone on read, by v_queue_item_metrics —
+# shifting it here would destroy the instant and make DST boundaries ambiguous.
+QUEUE_FIELD_MAP: dict[str, str] = {
+    "UniqueKey": "QueueKey",
+    "EndProcessing": "EndProcessing",
+    "Status": "Status",
+    # Joins to d_queues("Organization_ID", "Queue_ID") for the queue name.
+    "QueueDefinitionId": "Queue_ID",
+}
+
+_QUEUE_FIELD_TYPES: dict[str, str] = {
+    "UniqueKey": "text",
+    "EndProcessing": "timestamptz",
+    "Status": "text",
+    "QueueDefinitionId": "integer",
+}
+
+
+def persist_queue_items(
+    settings: Settings, client: ClientConfig, payload: dict
+) -> tuple[int, int, int] | None:
+    """Insert select queue-item fields into ``f_queue_item_metrics``.
+
+    Writes one compact row (organization id, queue key, end processing time,
+    status) per item. An item whose ``QueueKey`` is already stored is a
+    duplicate — the poll window can overlap on a re-run — and is discarded,
+    leaving the existing row untouched. Items with no ``UniqueKey`` are skipped
+    since that is the table's unique key. No-ops (returning ``None``) when no
+    ``DATABASE_URL`` is configured.
+
+    Returns:
+        ``(inserted, duplicates, skipped)``, or ``None`` if persistence was
+        skipped entirely (no database configured).
+
+    Raises:
+        RuntimeError: if a ``DATABASE_URL`` is set but ``psycopg`` is missing.
+    """
+    if not settings.database_url:
+        return None
+    if psycopg is None:
+        raise RuntimeError(
+            "DATABASE_URL is set but psycopg is not installed. "
+            "Run: pip install -r requirements.txt"
+        )
+
+    fields = list(QUEUE_FIELD_MAP)
+    cols = ["organization_id"] + [QUEUE_FIELD_MAP[f] for f in fields]
+    quoted = ", ".join(
+        c if c == "organization_id" else f'"{c}"' for c in cols
+    )
+    placeholders = ", ".join(["%s"] * len(cols))
+    sql = (
+        f"INSERT INTO f_queue_item_metrics ({quoted}) "
+        f"VALUES ({placeholders}) "
+        f'ON CONFLICT ("QueueKey") DO NOTHING'
+    )
+
+    items = payload.get("value", [])
+    inserted = 0
+    duplicates = 0
+    skipped = 0
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            for item in items:
+                key = item.get("UniqueKey")
+                if key is None or str(key).strip() == "":
+                    skipped += 1
+                    continue
+                row = [client.client_code] + [
+                    _coerce(item.get(f), _QUEUE_FIELD_TYPES[f]) for f in fields
+                ]
+                cur.execute(sql, row)
+                if cur.rowcount:
+                    inserted += 1
+                else:
+                    duplicates += 1
+        conn.commit()
+    return inserted, duplicates, skipped
+
+
+# --- d_queues: queue dimension ---------------------------------------------
+# Maps the QueueDefinitions API field -> table column. Quoted identifiers in
+# Postgres (mixed case), so every reference must stay quoted.
+#
+# ``Organization_ID`` is NOT taken from the API payload: like the fact tables
+# it is set to the configured client's ``client_code``, so every queue is
+# attributed to the Orchestrator client it was fetched from.
+QUEUE_DEFINITION_FIELD_MAP: dict[str, str] = {
+    "Id": "Queue_ID",
+    "Name": "QueueName",
+}
+
+_QUEUE_DEFINITION_FIELD_TYPES: dict[str, str] = {
+    "Id": "integer",
+    "Name": "text",
+}
+
+
+def persist_queue_definitions(
+    settings: Settings, client: ClientConfig, payload: dict
+) -> tuple[int, int] | None:
+    """Upsert queue definitions into ``d_queues``.
+
+    Writes one row per queue (organization id, queue id, queue name), keyed on
+    ``(Organization_ID, Queue_ID)``. Unlike the fact tables this *updates* on
+    conflict rather than discarding: ``d_queues`` is a dimension, so a queue
+    renamed in Orchestrator should be corrected here rather than left stale.
+
+    Queues with no ``Id`` are skipped, since that is half the unique key.
+    No-ops (returning ``None``) when no ``DATABASE_URL`` is configured.
+
+    Returns:
+        ``(written, skipped)`` — rows inserted or refreshed, and queues skipped
+        for having no ``Id`` — or ``None`` if persistence was skipped entirely.
+
+    Raises:
+        RuntimeError: if a ``DATABASE_URL`` is set but ``psycopg`` is missing.
+    """
+    if not settings.database_url:
+        return None
+    if psycopg is None:
+        raise RuntimeError(
+            "DATABASE_URL is set but psycopg is not installed. "
+            "Run: pip install -r requirements.txt"
+        )
+
+    fields = list(QUEUE_DEFINITION_FIELD_MAP)
+    cols = ["Organization_ID"] + [QUEUE_DEFINITION_FIELD_MAP[f] for f in fields]
+    quoted = ", ".join(f'"{c}"' for c in cols)
+    placeholders = ", ".join(["%s"] * len(cols))
+    sql = (
+        f"INSERT INTO d_queues ({quoted}) VALUES ({placeholders}) "
+        'ON CONFLICT ("Organization_ID", "Queue_ID") '
+        'DO UPDATE SET "QueueName" = EXCLUDED."QueueName"'
+    )
+
+    queues = payload.get("value", [])
+    written = 0
+    skipped = 0
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            for queue in queues:
+                if queue.get("Id") is None:
+                    skipped += 1
+                    continue
+                row = [client.client_code] + [
+                    _coerce(queue.get(f), _QUEUE_DEFINITION_FIELD_TYPES[f])
+                    for f in fields
+                ]
+                cur.execute(sql, row)
+                written += 1
+        conn.commit()
+    return written, skipped
+
+
+def existing_queue_keys(settings: Settings, keys: list[str]) -> set[str]:
+    """Return which of ``keys`` are already stored in ``f_queue_item_metrics``.
+
+    One round trip per page rather than one per key: the caller walks a page of
+    API results newest-first and stops at the first key this reports as known,
+    so the query is issued with the whole page at once.
+
+    Returns an empty set when no ``DATABASE_URL`` is configured, which makes
+    the caller fall back to fetching everything — correct, if slower.
+    """
+    if not settings.database_url or not keys:
+        return set()
+    if psycopg is None:
+        raise RuntimeError(
+            "DATABASE_URL is set but psycopg is not installed. "
+            "Run: pip install -r requirements.txt"
+        )
+    with psycopg.connect(settings.database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT "QueueKey" FROM f_queue_item_metrics '
+                'WHERE "QueueKey" = ANY(%s)',
+                (list(keys),),
+            )
+            return {row[0] for row in cur.fetchall()}
 
 
 def load_metrics_jobs(settings: Settings) -> dict | None:

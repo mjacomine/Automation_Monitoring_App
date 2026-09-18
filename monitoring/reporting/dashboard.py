@@ -449,6 +449,9 @@ function render() {
   $("table-body").innerHTML = out.join("");
   $("result-count").textContent = rows.length + " of " + RECORDS.length + " jobs";
   updateSummary();
+  // The Organization and Date filters are shared, so keep the queue
+  // matrix in step with the job matrix on every filter change.
+  if (QUEUE_COLUMNS.length) renderQueue();
 }
 
 // Wire one collapsible checkbox panel: open/close, outside-click, caret
@@ -492,6 +495,152 @@ function setupPanel(buttonId, panelId, onRefresh) {
       if (cb) { cb.checked = !cb.checked; onRefresh(); }
     }
   });
+}
+
+
+// --- Queue item metrics ----------------------------------------------------
+// A second matrix under the legend, aggregating f_queue_item_metrics by queue.
+// The database view v_queue_item_metrics joins d_queues on
+// (Organization_ID, Queue_ID) for the name, and converts EndProcessing into
+// the organization's own timezone. One column per status, then the queue's
+// total volume and its success rate.
+//
+// Rows are queues, but the shared Process Run Date filter still applies, so a
+// date selection narrows each queue's counts to that window.
+//
+// Success % here is Successful / total, per the queue definition — unlike the
+// job matrix it has no notion of an in-flight state to exclude, because the
+// API query already drops items still in "New".
+var QUEUE_RECORDS = [];   // {o: orgName, q: queueName, s: status, d: local YYYY-MM-DD}
+var QUEUE_STATUSES = [];
+var QUEUE_COLUMNS = [];
+var qSortKey = "qtotal";
+var qSortDir = "desc";    // busiest queue first
+
+function buildQueueColumns() {
+  var cols = [{ key: "queue", label: "Queue", type: "text",
+                get: function (r) { return r.queue; } }];
+  QUEUE_STATUSES.forEach(function (st) {
+    cols.push({ key: "qs:" + st, label: st, type: "num",
+                get: (function (status) {
+                  return function (r) { return r.counts[status] || 0; };
+                })(st) });
+  });
+  cols.push({ key: "qtotal", label: "Queue Volume", type: "num",
+              get: function (r) { return r.total; } });
+  cols.push({ key: "qpct", label: "Success %", type: "num",
+              get: function (r) { return r.pct; } });
+  return cols;
+}
+
+function queueColumnByKey(key) {
+  for (var i = 0; i < QUEUE_COLUMNS.length; i++) {
+    if (QUEUE_COLUMNS[i].key === key) return QUEUE_COLUMNS[i];
+  }
+  return QUEUE_COLUMNS[0];
+}
+
+function renderQueueHead() {
+  var html = "";
+  QUEUE_COLUMNS.forEach(function (c) {
+    var active = c.key === qSortKey;
+    var aria = active ? (qSortDir === "asc" ? "ascending" : "descending") : "none";
+    var arrow = active
+      ? '<span class="sort-arrow" aria-hidden="true">' +
+        (qSortDir === "asc" ? "&#9650;" : "&#9660;") + "</span>"
+      : '<span class="sort-arrow dim" aria-hidden="true">&#8693;</span>';
+    html += '<th scope="col" aria-sort="' + aria + '">' +
+      '<button type="button" class="th-sort' + (active ? " active" : "") +
+      '" data-key="' + esc(c.key) + '">' +
+      '<span>' + esc(c.label) + "</span>" + arrow + "</button></th>";
+  });
+  $("queue-thead-row").innerHTML = html;
+}
+
+function setupQueueSorting() {
+  $("queue-thead-row").addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest(".th-sort") : null;
+    if (!btn) return;
+    var key = btn.getAttribute("data-key");
+    if (key === qSortKey) {
+      qSortDir = qSortDir === "asc" ? "desc" : "asc";
+    } else {
+      qSortKey = key;
+      qSortDir = defaultDirFor(queueColumnByKey(key));
+    }
+    renderQueue();
+  });
+}
+
+function renderQueue() {
+  // Queue items carry no ReleaseName, so the Process filter does not apply;
+  // Organization and Process Run Date do.
+  var rows = QUEUE_RECORDS.filter(function (r) {
+    return (selectedOrgs.length === 0 || selectedOrgs.indexOf(r.o) !== -1) &&
+           dateMatches(r.d);
+  });
+
+  var byQueue = {};
+  rows.forEach(function (r) {
+    var q = r.q || "(unknown queue)";
+    var st = r.s || "(unknown)";
+    if (!byQueue[q]) byQueue[q] = {};
+    byQueue[q][st] = (byQueue[q][st] || 0) + 1;
+  });
+
+  var days = Object.keys(byQueue).map(function (q) {
+    var counts = byQueue[q];
+    var total = Object.keys(counts).reduce(function (a, k) { return a + counts[k]; }, 0);
+    var successful = counts["Successful"] || 0;
+    return { queue: q, counts: counts, total: total, successful: successful,
+             pct: total ? (successful / total) * 100 : 0 };
+  });
+
+  var col = queueColumnByKey(qSortKey);
+  var dir = qSortDir === "asc" ? 1 : -1;
+  days.sort(function (a, b) {
+    var av = col.get(a), bv = col.get(b), cmp;
+    cmp = col.type === "text" ? String(av).localeCompare(String(bv)) : av - bv;
+    if (cmp === 0) return a.queue.localeCompare(b.queue);
+    return cmp * dir;
+  });
+  renderQueueHead();
+
+  var grandTotal = days.reduce(function (a, r) { return a + r.total; }, 0);
+  var grandSucc = days.reduce(function (a, r) { return a + r.successful; }, 0);
+  var overall = grandTotal ? (grandSucc / grandTotal) * 100 : 0;
+  $("kpi-queue-volume").textContent = grandTotal;
+  var qs = $("kpi-queue-success");
+  qs.textContent = overall.toFixed(1) + "%";
+  qs.className = "value " + (overall >= THRESHOLD ? "ok" : "risk");
+  $("kpi-queue-count").textContent = days.length;
+
+  var out = [];
+  days.forEach(function (r) {
+    var cls = r.pct >= THRESHOLD ? "ok" : "risk";
+    var cells = "";
+    QUEUE_STATUSES.forEach(function (st) {
+      cells += "<td class='num'>" + (r.counts[st] || 0) + "</td>";
+    });
+    out.push('<tr><td class="name">' + esc(r.queue) + "</td>" + cells +
+      '<td class="num total">' + r.total + "</td>" +
+      '<td class="pct ' + cls + '"><span class="dot ' + cls + '"></span>' +
+      r.pct.toFixed(1) + "%</td></tr>");
+  });
+  if (out.length === 0) {
+    out.push('<tr><td colspan="' + (QUEUE_STATUSES.length + 3) +
+      '" class="empty-row">No queue items match the selected filters.</td></tr>');
+  }
+  $("queue-table-body").innerHTML = out.join("");
+  $("queue-result-count").textContent =
+    rows.length + " of " + QUEUE_RECORDS.length + " queue items";
+}
+
+function initQueue() {
+  QUEUE_STATUSES = distinct(QUEUE_RECORDS.map(function (r) { return r.s; })).sort();
+  QUEUE_COLUMNS = buildQueueColumns();
+  setupQueueSorting();
+  renderQueue();
 }
 
 // Called by the auth/fetch bootstrap once RECORDS and STATES are populated
@@ -561,9 +710,32 @@ _DASHBOARD_BOOTSTRAP = """
     });
     STATES = Array.from(new Set(RECORDS.map(function (r) { return r.s; })
       .filter(Boolean))).sort();
+    // Queue items come from v_queue_item_metrics, which resolves the
+    // organization name and converts EndProcessing into that organization's
+    // timezone. It is a security_invoker view, so the same RLS policy applies.
+    var qrows = [], qfrom = 0;
+    while (true) {
+      var qres = await sb.from("v_queue_item_metrics")
+        .select("organization_id, organization_name, queue_name, status, end_processing_date_local")
+        .range(qfrom, qfrom + PAGE - 1);
+      if (qres.error) throw qres.error;
+      qrows = qrows.concat(qres.data);
+      if (qres.data.length < PAGE) break;
+      qfrom += PAGE;
+    }
+    QUEUE_RECORDS = qrows.map(function (r) {
+      return {
+        o: r.organization_name || orgs[r.organization_id] || r.organization_id,
+        q: r.queue_name,
+        s: r.status,
+        d: r.end_processing_date_local || null
+      };
+    });
+
     var stamp = document.getElementById("refresh-stamp");
     if (stamp) stamp.textContent = new Date().toLocaleString();
     initDashboard();
+    initQueue();
   } catch (e) {
     var tb = document.getElementById("table-body");
     if (tb) tb.innerHTML = '<tr><td colspan="20" class="empty-row">Could not load ' +
@@ -716,6 +888,39 @@ def render_dashboard(
         f"Success % &lt; {threshold:.0f}% (Needs Attention)</span>\n"
         "      </div>\n"
         "    </section>\n"
+    )
+
+    # Queue-item matrix: sits directly below the legend, aggregating queue
+    # throughput per day in the organization's own timezone.
+    queue_part = (
+        '\n    <section class="card is-flush" aria-label="Queue item metrics">\n'
+        '      <div class="card-head queue-head">\n'
+        "        <div>\n"
+        "          <h2>Queue Item Metrics</h2>\n"
+        '          <p class="card-note">Processed queue items by completion '
+        "date, shown in each organization&rsquo;s local time. "
+        "Success % is Successful &divide; total.</p>\n"
+        "        </div>\n"
+        '        <div class="muted" id="queue-result-count"></div>\n'
+        "      </div>\n"
+        '      <div class="kpis queue-kpis">\n'
+        '        <div class="kpi"><div class="label">Queues Reported</div>'
+        '<div class="value" id="kpi-queue-count">0</div></div>\n'
+        '        <div class="kpi"><div class="label">Queue Volume</div>'
+        '<div class="value" id="kpi-queue-volume">0</div></div>\n'
+        '        <div class="kpi"><div class="label">Success %</div>'
+        '<div class="value" id="kpi-queue-success">0.0%</div></div>\n'
+        "      </div>\n"
+        '      <div class="table-scroll">\n'
+        "        <table>\n"
+        '          <thead><tr id="queue-thead-row"></tr></thead>\n'
+        '          <tbody id="queue-table-body"></tbody>\n'
+        "        </table>\n"
+        "      </div>\n"
+        "    </section>\n"
+    )
+
+    page_end = (
         "\n    <footer>UiPath Orchestrator &mdash; Automated reporting</footer>\n"
         "  </main>\n"
     )
@@ -743,6 +948,8 @@ def render_dashboard(
         + controls
         + table_part
         + legend
+        + queue_part
+        + page_end
         + data_script
         + "</body>\n</html>"
     )

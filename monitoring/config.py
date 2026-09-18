@@ -49,6 +49,10 @@ class ClientConfig:
         """Build this client's fully-qualified QueueItems OData URL."""
         return f"{self._odata_base(base_url)}/QueueItems"
 
+    def queue_definitions_url(self, base_url: str) -> str:
+        """Build this client's fully-qualified QueueDefinitions OData URL."""
+        return f"{self._odata_base(base_url)}/QueueDefinitions"
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -84,6 +88,17 @@ class Settings:
 
     # --- Behaviour ----------------------------------------------------------
     request_timeout: int = 30
+    # --- Rate limiting ------------------------------------------------------
+    # Orchestrator returns HTTP 429 under sustained polling (observed at ~100
+    # rapid QueueItems pages). Requests from one client are spaced by at least
+    # this many seconds; because it is measured from the previous request, an
+    # occasional call waits not at all and only a tight loop is throttled.
+    min_request_interval: float = 0.2
+    # How many times a 429 is retried before the error is raised to the caller.
+    rate_limit_retries: int = 6
+    # Ceiling on a single backoff wait, so a hostile Retry-After cannot stall
+    # the run indefinitely.
+    rate_limit_max_wait: float = 120.0
     # Success-rate threshold (percent) at or above which a process is "healthy".
     success_threshold: float = 90.0
     # Where the generated HTML dashboard is written.

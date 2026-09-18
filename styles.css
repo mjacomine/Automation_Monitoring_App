@@ -776,3 +776,16 @@ td.pct.risk { color: var(--risk); }
 @media (prefers-reduced-motion: reduce) {
   .beam-card::before { animation: none; }
 }
+
+/* ============================================================================
+   Queue item metrics — second matrix below the legend on the dashboard
+   ========================================================================== */
+.queue-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; padding: 22px 24px 0; margin-bottom: 0;
+}
+.queue-head .muted { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
+/* Inset KPI strip: the card is flush so the table can span edge to edge. */
+/* Three KPIs here, not the dashboard's five; the shared breakpoints at
+   1000px/640px still collapse it to 2 then 1 column. */
+.queue-kpis { grid-template-columns: repeat(3, 1fr); padding: 16px 24px 20px; }
